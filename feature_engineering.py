@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 
 def feature_extractor(new_df: pd.DataFrame) -> pd.DataFrame:
+    if 'amount' in new_df.columns:   # Hack
+        return new_df
+
     if 'ask5' not in new_df.columns:
         # 价格+1（从涨跌幅还原到对前收盘价的比例）
         new_df['bid1'] = new_df['n_bid1']+1
@@ -70,8 +73,8 @@ def feature_extractor(new_df: pd.DataFrame) -> pd.DataFrame:
     # else:
     #     print("已经提取过 对量取对数")
 
-    mask = [False] * 99 + [True] * (len(new_df) - 99) # 前99个数据无法计算滚动特征，去掉
-    return new_df[mask]
+    new_df = new_df.iloc[99:].reset_index(drop=True)  # 去除前99个数据（滚动特征无法计算）
+    return new_df
 
 def compute_ofi(df):
     """

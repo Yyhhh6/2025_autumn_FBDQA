@@ -21,9 +21,13 @@ import pandas as pd
 
 def read_csv_parallel(file_list, N):
     def read_single_file(file):
-        data = pd.read_csv(file)[:-N]
-        data = data.reset_index(drop=True)     # 重置行索引，从 0 开始
-        return data
+        try:
+            data = pd.read_csv(file)[:-N]
+            data = data.reset_index(drop=True)     # 重置行索引，从 0 开始
+            return data
+        except:
+            print("file: ", file)
+            raise
     
     with ThreadPoolExecutor() as executor:
         dfs = list(executor.map(read_single_file, file_list))
@@ -45,10 +49,12 @@ def extract_feature(file_dir):
         if os.path.exists(save_path):
             try:
                 df = pd.read_csv(save_path)
+                if df.empty:
+                    raise ValueError(f"File {file} is empty.")
                 df = df.reset_index(drop=True)
                 df = feature_extractor(df)
                 df.to_csv(save_path, index=False)       # 保存到目标文件（新建或覆盖）
-            except pd.errors.EmptyDataError:
+            except pd.errors.EmptyDataError or ValueError:
                 df = pd.read_csv(file)
                 df = df.reset_index(drop=True)
                 df = feature_extractor(df)
@@ -58,6 +64,12 @@ def extract_feature(file_dir):
             df = df.reset_index(drop=True)
             df = feature_extractor(df)
             df.to_csv(save_path, index=False)       # 保存到目标文件（新建或覆盖）
+
+        # # Hack: 全部从头再来
+        # df = pd.read_csv(file)
+        # df = df.reset_index(drop=True)
+        # df = feature_extractor(df)
+        # df.to_csv(save_path, index=False)       # 保存到目标文件（新建或覆盖）
 
         return save_path
 
@@ -74,7 +86,7 @@ def extract_feature(file_dir):
 def split_data(file_dir, train_ratio, val_ratio, seed, N_list):
     random.seed(seed)
     
-    raw_data_dir = os.path.join(file_dir, "data_raw")
+    raw_data_dir = os.path.join(file_dir, "data_extract_feature")
     save_dir = os.path.join(file_dir, "data_extract_feature_split")
     os.makedirs(save_dir, exist_ok=True)
     

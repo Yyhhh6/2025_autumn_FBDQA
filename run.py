@@ -52,6 +52,8 @@ for N in N_list:
     train_data['time_label'] = assign_tick_time_labels(train_data['time'])
     val_data['time_label'] = assign_tick_time_labels(val_data['time'])
 
+    print("train_data的列名：", train_data.columns.tolist())
+
     # 去NaN
     assert not train_data[feature_names].isnull().sum().any(), "train_data中存在NaN值，请检查！"
     assert not val_data[feature_names].isnull().sum().any(), "val_data中存在NaN值，请检查！"
