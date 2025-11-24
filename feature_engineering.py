@@ -2,63 +2,79 @@ import numpy as np
 import pandas as pd
 
 def feature_extractor(new_df: pd.DataFrame) -> pd.DataFrame:
-    # 价格+1（从涨跌幅还原到对前收盘价的比例）
-    new_df['bid1'] = new_df['n_bid1']+1
-    new_df['bid2'] = new_df['n_bid2']+1
-    new_df['bid3'] = new_df['n_bid3']+1
-    new_df['bid4'] = new_df['n_bid4']+1
-    new_df['bid5'] = new_df['n_bid5']+1
-    new_df['ask1'] = new_df['n_ask1']+1
-    new_df['ask2'] = new_df['n_ask2']+1
-    new_df['ask3'] = new_df['n_ask3']+1
-    new_df['ask4'] = new_df['n_ask4']+1
-    new_df['ask5'] = new_df['n_ask5']+1
-    # 均线特征
-    new_df['ask1_ma5']  = new_df['ask1'].rolling(window=5,  min_periods=1).mean()
-    new_df['ask1_ma10'] = new_df['ask1'].rolling(window=10, min_periods=1).mean()
-    new_df['ask1_ma20'] = new_df['ask1'].rolling(window=20, min_periods=1).mean()
-    new_df['ask1_ma40'] = new_df['ask1'].rolling(window=40, min_periods=1).mean()
-    new_df['ask1_ma60'] = new_df['ask1'].rolling(window=60, min_periods=1).mean()
-    new_df['ask1_ma80'] = new_df['ask1'].rolling(window=80, min_periods=1).mean()
-    new_df['ask1_ma100'] = new_df['ask1'].rolling(window=100, min_periods=1).mean()
-    new_df['bid1_ma5']  = new_df['bid1'].rolling(window=5,  min_periods=1).mean()
-    new_df['bid1_ma10'] = new_df['bid1'].rolling(window=10, min_periods=1).mean()
-    new_df['bid1_ma20'] = new_df['bid1'].rolling(window=20, min_periods=1).mean()
-    new_df['bid1_ma40'] = new_df['bid1'].rolling(window=40, min_periods=1).mean()
-    new_df['bid1_ma60'] = new_df['bid1'].rolling(window=60, min_periods=1).mean()
-    new_df['bid1_ma80'] = new_df['bid1'].rolling(window=80, min_periods=1).mean()
-    new_df['bid1_ma100'] = new_df['bid1'].rolling(window=100, min_periods=1).mean()
+    if 'amount' in new_df.columns:   # Hack
+        return new_df
 
-    # 量价组合
-    new_df['spread1'] =  new_df['ask1'] - new_df['bid1']
-    new_df['spread2'] =  new_df['ask2'] - new_df['bid2']
-    new_df['spread3'] =  new_df['ask3'] - new_df['bid3']
-    new_df['mid_price1'] =  new_df['ask1'] + new_df['bid1']
-    new_df['mid_price2'] =  new_df['ask2'] + new_df['bid2']
-    new_df['mid_price3'] =  new_df['ask3'] + new_df['bid3']
-    new_df['weighted_ab1'] = (new_df['ask1'] * new_df['n_bsize1'] + new_df['bid1'] * new_df['n_asize1']) / (new_df['n_bsize1'] + new_df['n_asize1'])
-    new_df['weighted_ab2'] = (new_df['ask2'] * new_df['n_bsize2'] + new_df['bid2'] * new_df['n_asize2']) / (new_df['n_bsize2'] + new_df['n_asize2'])
-    new_df['weighted_ab3'] = (new_df['ask3'] * new_df['n_bsize3'] + new_df['bid3'] * new_df['n_asize3']) / (new_df['n_bsize3'] + new_df['n_asize3'])
+    if 'ask5' not in new_df.columns:
+        # 价格+1（从涨跌幅还原到对前收盘价的比例）
+        new_df['bid1'] = new_df['n_bid1']+1
+        new_df['bid2'] = new_df['n_bid2']+1
+        new_df['bid3'] = new_df['n_bid3']+1
+        new_df['bid4'] = new_df['n_bid4']+1
+        new_df['bid5'] = new_df['n_bid5']+1
+        new_df['ask1'] = new_df['n_ask1']+1
+        new_df['ask2'] = new_df['n_ask2']+1
+        new_df['ask3'] = new_df['n_ask3']+1
+        new_df['ask4'] = new_df['n_ask4']+1
+        new_df['ask5'] = new_df['n_ask5']+1
+    # else:
+    #     print("已经提取过 价格+1")
 
-    new_df['relative_spread1'] = new_df['spread1'] / new_df['mid_price1']
-    new_df['relative_spread2'] = new_df['spread2'] / new_df['mid_price2']
-    new_df['relative_spread3'] = new_df['spread3'] / new_df['mid_price3']
+    if 'bid1_ma100' not in new_df.columns:
+        # 均线特征
+        new_df['ask1_ma5']  = new_df['ask1'].rolling(window=5,  min_periods=1).mean()
+        new_df['ask1_ma10'] = new_df['ask1'].rolling(window=10, min_periods=1).mean()
+        new_df['ask1_ma20'] = new_df['ask1'].rolling(window=20, min_periods=1).mean()
+        new_df['ask1_ma40'] = new_df['ask1'].rolling(window=40, min_periods=1).mean()
+        new_df['ask1_ma60'] = new_df['ask1'].rolling(window=60, min_periods=1).mean()
+        new_df['ask1_ma80'] = new_df['ask1'].rolling(window=80, min_periods=1).mean()
+        new_df['ask1_ma100'] = new_df['ask1'].rolling(window=100, min_periods=1).mean()
+        new_df['bid1_ma5']  = new_df['bid1'].rolling(window=5,  min_periods=1).mean()
+        new_df['bid1_ma10'] = new_df['bid1'].rolling(window=10, min_periods=1).mean()
+        new_df['bid1_ma20'] = new_df['bid1'].rolling(window=20, min_periods=1).mean()
+        new_df['bid1_ma40'] = new_df['bid1'].rolling(window=40, min_periods=1).mean()
+        new_df['bid1_ma60'] = new_df['bid1'].rolling(window=60, min_periods=1).mean()
+        new_df['bid1_ma80'] = new_df['bid1'].rolling(window=80, min_periods=1).mean()
+        new_df['bid1_ma100'] = new_df['bid1'].rolling(window=100, min_periods=1).mean()
+    # else:
+    #     print("已经提取过 均线特征")
+
+    if 'relative_spread3' not in new_df.columns:
+        # 量价组合
+        new_df['spread1'] =  new_df['ask1'] - new_df['bid1']
+        new_df['spread2'] =  new_df['ask2'] - new_df['bid2']
+        new_df['spread3'] =  new_df['ask3'] - new_df['bid3']
+        new_df['mid_price1'] =  new_df['ask1'] + new_df['bid1']
+        new_df['mid_price2'] =  new_df['ask2'] + new_df['bid2']
+        new_df['mid_price3'] =  new_df['ask3'] + new_df['bid3']
+        new_df['weighted_ab1'] = (new_df['ask1'] * new_df['n_bsize1'] + new_df['bid1'] * new_df['n_asize1']) / (new_df['n_bsize1'] + new_df['n_asize1'])
+        new_df['weighted_ab2'] = (new_df['ask2'] * new_df['n_bsize2'] + new_df['bid2'] * new_df['n_asize2']) / (new_df['n_bsize2'] + new_df['n_asize2'])
+        new_df['weighted_ab3'] = (new_df['ask3'] * new_df['n_bsize3'] + new_df['bid3'] * new_df['n_asize3']) / (new_df['n_bsize3'] + new_df['n_asize3'])
+
+        new_df['relative_spread1'] = new_df['spread1'] / new_df['mid_price1']
+        new_df['relative_spread2'] = new_df['spread2'] / new_df['mid_price2']
+        new_df['relative_spread3'] = new_df['spread3'] / new_df['mid_price3']
+    # else:
+    #     print("已经提取过 量价组合")
     
-    # 对量取对数
-    new_df['bsize1'] = new_df['n_bsize1'].map(np.log)
-    new_df['bsize2'] = new_df['n_bsize2'].map(np.log)
-    new_df['bsize3'] = new_df['n_bsize3'].map(np.log)
-    new_df['bsize4'] = new_df['n_bsize4'].map(np.log)
-    new_df['bsize5'] = new_df['n_bsize5'].map(np.log)
-    new_df['asize1'] = new_df['n_asize1'].map(np.log)
-    new_df['asize2'] = new_df['n_asize2'].map(np.log)
-    new_df['asize3'] = new_df['n_asize3'].map(np.log)
-    new_df['asize4'] = new_df['n_asize4'].map(np.log)
-    new_df['asize5'] = new_df['n_asize5'].map(np.log)
-    new_df['amount'] = new_df['amount_delta'].map(np.log1p)
+    if 'amount' not in new_df.columns:
+        # 对量取对数
+        new_df['bsize1'] = new_df['n_bsize1'].map(np.log)
+        new_df['bsize2'] = new_df['n_bsize2'].map(np.log)
+        new_df['bsize3'] = new_df['n_bsize3'].map(np.log)
+        new_df['bsize4'] = new_df['n_bsize4'].map(np.log)
+        new_df['bsize5'] = new_df['n_bsize5'].map(np.log)
+        new_df['asize1'] = new_df['n_asize1'].map(np.log)
+        new_df['asize2'] = new_df['n_asize2'].map(np.log)
+        new_df['asize3'] = new_df['n_asize3'].map(np.log)
+        new_df['asize4'] = new_df['n_asize4'].map(np.log)
+        new_df['asize5'] = new_df['n_asize5'].map(np.log)
+        new_df['amount'] = new_df['amount_delta'].map(np.log1p)
+    # else:
+    #     print("已经提取过 对量取对数")
 
-    mask = [False] * 99 + [True] * (len(new_df) - 99) # 前99个数据无法计算滚动特征，去掉
-    return new_df[mask]
+    new_df = new_df.iloc[99:].reset_index(drop=True)  # 去除前99个数据（滚动特征无法计算）
+    return new_df
 
 def compute_ofi(df):
     """
