@@ -1,0 +1,13 @@
+
+========================================
+Start training for N=5
+effective samples -> train: 2300530 val: 581765 test: 581765
+Training LightGBM (GPU)...
+Training SGDClassifier (incremental logistic)...
+[SGD] epoch 0 val f0.5_macro = 0.3844 precision_macro = 0.5406 recall_macro = 0.3672
+[SGD] epoch 1 val f0.5_macro = 0.3115 precision_macro = 0.6025 recall_macro = 0.3465
+[SGD] epoch 2 val f0.5_macro = 0.3244 precision_macro = 0.5898 recall_macro = 0.3496
+SGD N=5 test f0.5_macro: 0.3244 precision_macro: 0.5898 recall_macro: 0.3496
+bps_pnl: 7896423.252447287
+Cumulative strategy return: 789.6423
+Cumulative buy-and-hold return: -9241.8666
