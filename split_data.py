@@ -19,16 +19,7 @@ from feature_engineering import *
 
 def read_csv_parallel(file_list, N):
     def read_single_file(file, N):
-        # data1 = pd.read_csv(file)
-        # print("data1 shape:", data1.shape)
-        # print("data1 tail:\n", data1.tail(10))
-        # data2 = data1[:-N]
-        # print("data2 shape:", data2.shape)
-        # print("data2 tail:\n", data2.tail(10))
-        # print("-"*50)
         data = pd.read_csv(file)[:-N]
-        # features = extract_features_for_day(data, window=100)
-        # data = features.join(data).reset_index(drop=True)
         data = feature_extractor(data)
         data = data.reset_index(drop=True)
         return data
@@ -77,4 +68,3 @@ def load_data(file_dir, N):
     val_data = pd.read_csv(val_path)
     
     return train_data, val_data
-    
