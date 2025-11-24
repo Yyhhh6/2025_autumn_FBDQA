@@ -7,76 +7,76 @@ import random
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, log_loss, mean_squared_log_error
 from utils import *
-from catboost import CatBoostClassifier
+# from catboost import CatBoostClassifier
 from data_analyze import analyze_quantitative_data
 from concurrent.futures import ThreadPoolExecutor
 import glob
 import time
+from data_process import *
+from classifier_pipeline import *
+from split_data import load_data, extract_feature, split_data
+from feature_engineering import *
 
-pd.set_option('display.max_columns', None)  # 显示所有列
-pd.set_option('display.width', 1000)        # 设置显示宽度
-pd.set_option('display.max_colwidth', None) # 显示完整的列内容
+TRAIN_RATIO = 0.7
+VAL_RATIO = 0.2  # 测试集自动是 0.1
+SEED = 42
 
-TRAIN_VAL_RATIO = 0.8
-seed = 42
-random.seed(seed)
+# N_list = [5, 10, 20, 40, 60]
+N_list = [5]
+alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
+file_dir="./data"
 
-file_dir = "./data"
+# 特征提取
+extract_feature(file_dir=file_dir)
+split_data(file_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, seed=SEED, N_list=N_list)
 
-train_files = []
-val_files = []
-train_data = pd.DataFrame()
-val_data = pd.DataFrame()
-
-def read_csv_parallel(file_list):
-    def read_single_file(file):
-        return pd.read_csv(file)
-    
-    with ThreadPoolExecutor() as executor:
-        dfs = list(executor.map(read_single_file, file_list))
-    
-    return pd.concat(dfs, axis=0, ignore_index=True)
-
-csv_files = glob.glob(os.path.join(file_dir, "*.csv"))
-
-for file_path in csv_files:
-    if random.random() < TRAIN_VAL_RATIO:
-        train_files.append(file_path)
-    else:
-        val_files.append(file_path)
-
-train_data = read_csv_parallel(train_files)
-val_data = read_csv_parallel(val_files)
+feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice',
+                'n_bid1', 'n_bsize1', 'n_bid2', 'n_bsize2', 'n_bid3', 'n_bsize3',
+                'n_bid4', 'n_bsize4', 'n_bid5', 'n_bsize5', 'n_ask1', 'n_asize1', 
+                'n_ask2', 'n_asize2', 'n_ask3', 'n_asize3', 'n_ask4', 'n_asize4', 
+                'n_ask5', 'n_asize5', 'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 
+                'ask1', 'ask2', 'ask3', 'ask4', 'ask5', 'ask1_ma5', 'ask1_ma10', 
+                'ask1_ma20', 'ask1_ma40', 'ask1_ma60', 'ask1_ma80', 'ask1_ma100', 
+                'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', 
+                'bid1_ma80', 'bid1_ma100', 'spread1', 'spread2', 'spread3', 
+                'mid_price1', 'mid_price2', 'mid_price3', 'weighted_ab1', 
+                'weighted_ab2', 'weighted_ab3', 'relative_spread1', 'relative_spread2', 
+                'relative_spread3', 'bsize1', 'bsize2', 'bsize3', 'bsize4', 'bsize5', 
+                'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount']
 
 
-# 自己划分训练集和验证集
-# start_time = time.time()
-# for file_name in os.listdir(file_dir):
-#     if not file_name.endswith(".csv"):
-#         continue
-#     if random.random() < TRAIN_VAL_RATIO:
-#         train_files.append(os.path.join(file_dir,file_name))
-#     else:
-#         val_files.append(os.path.join(file_dir,file_name))
+for N in N_list:
+    train_data, val_data, test_data = load_data(file_dir=file_dir, N=N) # TODO：此时是针对不同N训练不同的模型，需要训练一个统一的模型吗？
 
-# print(f"val_files is {val_files}")
+    # 增加时间标签特征
+    train_data['time_label'] = assign_tick_time_labels(train_data['time'])
+    val_data['time_label'] = assign_tick_time_labels(val_data['time'])
 
-# train_dfs = [pd.read_csv(f, low_memory=False) for f in train_files]
-# train_data = pd.concat(train_dfs, axis=0, ignore_index=True)
-# val_dfs = [pd.read_csv(f, low_memory=False) for f in val_files]
-# val_data = pd.concat(val_dfs, axis=0, ignore_index=True)
+    print("train_data的列名：", train_data.columns.tolist())
 
-# end_time = time.time()
-# print(f"数据读取耗时: {end_time - start_time:.2f} 秒")
-# exit()
+    # 去NaN
+    assert not train_data[feature_names].isnull().sum().any(), "train_data中存在NaN值，请检查！"
+    assert not val_data[feature_names].isnull().sum().any(), "val_data中存在NaN值，请检查！"
 
+    # 去极值
+    train_data = extreme_process_MAD(train_data, feature_names=feature_names, num=3)
+    val_data = extreme_process_MAD(val_data, feature_names=feature_names, num=3)
 
-analyze_quantitative_data(train_data, val_data, output_dir="./analysis_results")
+    assert not train_data.isnull().any().any(), "train_data中存在NaN值，请检查！"
+    assert not val_data.isnull().any().any(), "val_data中存在NaN值，请检查！"
+    def check_finite_pandas(df):   # 检查无限值和NaN值
+        has_inf = np.isinf(df.select_dtypes(include=[np.number])).any().any()
+        has_na = df.isna().any().any()
+        return not (has_inf or has_na)
 
-# 先用原始数据作为特征试试
-feature_col_names = [f for f in train_data.columns if f not in ['date','time','sym','label_5','label_10','label_20','label_40','label_60']] # TODO: 时间特征后续可以考虑加入
-label_col_name = ['label_5','label_10','label_20','label_40','label_60']
+    # 修改断言
+    assert check_finite_pandas(train_data), "train_data中存在inf或NaN值，请检查！"
+    assert check_finite_pandas(val_data), "val_data中存在inf或NaN值，请检查！"
 
-for label in label_col_name:
-    print(f'=================== {label} ===================')
-    run_tree_model(CatBoostClassifier, train_data[feature_col_names], train_data[label], val_data[feature_col_names], val_data[label], seed)
+    # 归一化
+    train_data[feature_names] = data_scale_Z_Score(train_data, feature_names=feature_names)
+    val_data[feature_names] = data_scale_Z_Score(val_data, feature_names=feature_names)
+
+    results = run_pipeline(train_data, val_data, feature_names, N_list, alpha_map, out_dir="./results", device="cuda")
+    print(results)
+    # exit()
