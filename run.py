@@ -14,20 +14,21 @@ import glob
 import time
 from data_process import *
 from classifier_pipeline import *
-from split_data import split_and_save_data, load_data
+from split_data import load_data, extract_feature, split_data
 from feature_engineering import *
 
-TRAIN_VAL_RATIO = 0.8
-seed = 42
-random.seed(seed)
+TRAIN_RATIO = 0.7
+VAL_RATIO = 0.2  # 测试集自动是 0.1
+SEED = 42
 
-N_list = [5, 10, 20, 40, 60]
+# N_list = [5, 10, 20, 40, 60]
 N_list = [5]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
-file_dir = "./data"
+file_dir="./data"
 
-# 数据处理
-split_and_save_data(file_dir, N_list, train_val_ratio=TRAIN_VAL_RATIO, seed=seed)
+# 特征提取
+extract_feature(file_dir=file_dir)
+split_data(file_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, seed=SEED, N_list=N_list)
 
 feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice',
                 'n_bid1', 'n_bsize1', 'n_bid2', 'n_bsize2', 'n_bid3', 'n_bsize3',
@@ -45,7 +46,7 @@ feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice',
 
 
 for N in N_list:
-    train_data, val_data = load_data(file_dir, N=N) # TODO：此时是针对不同N训练不同的模型，需要训练一个统一的模型吗？
+    train_data, val_data, test_data = load_data(file_dir=file_dir, N=N) # TODO：此时是针对不同N训练不同的模型，需要训练一个统一的模型吗？
 
     # 增加时间标签特征
     train_data['time_label'] = assign_tick_time_labels(train_data['time'])
