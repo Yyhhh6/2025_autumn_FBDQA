@@ -1,0 +1,83 @@
+# .gitignore - 通用 Python / quant 项目配置（根据 src/quant 目录常见内容）
+# 可根据实际情况增减条目
+
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / editor
+.vscode/
+.idea/
+*.sublime-*
+*.swp
+
+# Jupyter
+.ipynb_checkpoints
+
+# Distribution / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# C extensions / compiled artifacts
+*.so
+*.dll
+*.dylib
+
+# Machine learning models & checkpoints / large binary artifacts
+models/
+checkpoints/
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+
+# Data and results (常为大文件，通常不纳入版本控制)
+data/
+datasets/
+outputs/
+results/
+logs/
+
+# Logs and runtime files
+*.log
+*.out
+*.err
+tmp/
+temp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets / env files
+.env.local
+.env.*.local
+secrets.json
+credentials.json
+*.pem
+*.key
+
+# Python type check / lint caches
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Docker override (optional)
+docker-compose.override.yml
