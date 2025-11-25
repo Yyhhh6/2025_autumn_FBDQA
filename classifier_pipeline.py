@@ -31,62 +31,62 @@ def classification_metrics(y_true, y_pred):
     }
     return metrics
 
-# # -------------------------
-# # 4) LightGBM (GPU) 训练 & 测试
-# # -------------------------
-# def train_lightgbm_gpu(X_train, y_train, X_val, y_val, feature_names, save_path="lgb_model.txt",
-#                        num_class=3, params_override=None):
-#     # 转 np.ndarray (float32/int32)
-#     X_train = X_train.astype("float32")
-#     X_val = X_val.astype("float32")
+# -------------------------
+# 4) LightGBM (GPU) 训练 & 测试
+# -------------------------
+def train_lightgbm_gpu(X_train, y_train, X_val, y_val, feature_names, save_path="lgb_model.txt",
+                       num_class=3, params_override=None):
+    # 转 np.ndarray (float32/int32)
+    X_train = X_train.astype("float32")
+    X_val = X_val.astype("float32")
 
-#     lgb_params = {
-#         "objective": "multiclass",
-#         "num_class": num_class,
-#         "metric": "multi_logloss",
-#         "learning_rate": 0.05,
-#         "num_leaves": 64, # TODO：调整模型的拟合能力，越大能拟合更多的非线性
-#         "max_depth": -1,
-#         "device": "gpu",
-#         "gpu_platform_id": 0,
-#         "gpu_device_id": 0,
-#         "early_stopping_rounds": 50,
-#         "verbosity": 100
-#     }
-#     if params_override:
-#         lgb_params.update(params_override)
+    lgb_params = {
+        "objective": "multiclass",
+        "num_class": num_class,
+        "metric": "multi_logloss",
+        "learning_rate": 0.05,
+        "num_leaves": 64, # TODO：调整模型的拟合能力，越大能拟合更多的非线性
+        "max_depth": -1,
+        "device": "gpu",
+        "gpu_platform_id": 0,
+        "gpu_device_id": 0,
+        "early_stopping_rounds": 50,
+        "verbosity": 100
+    }
+    if params_override:
+        lgb_params.update(params_override)
 
-#     dtrain = lgb.Dataset(X_train, label=y_train, feature_name=feature_names) # TODO：随机划分？
-#     dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
+    dtrain = lgb.Dataset(X_train, label=y_train, feature_name=feature_names) # TODO：随机划分？
+    dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
 
-#     bst = lgb.train(
-#         lgb_params,
-#         dtrain,
-#         valid_sets=[dval],
-#         valid_names=["valid"],
-#         num_boost_round=2000,
-#     )
-#     bst.save_model(save_path)
-#     return bst
+    bst = lgb.train(
+        lgb_params,
+        dtrain,
+        valid_sets=[dval],
+        valid_names=["valid"],
+        num_boost_round=2000,
+    )
+    bst.save_model(save_path)
+    return bst
 
-# # -------------------------
-# # 5) SGDClassifier (incremental) 训练 & 测试 （Logistic Regression）
-# # -------------------------
-# def train_sgd_incremental(X_train, y_train, X_val, y_val, classes=[0,1,2], max_epochs=3, batch_size=100000):
-#     """
-#     使用 partial_fit 增量训练 SGDClassifier（适合大样本）。
-#     X_train, y_train 可以是 numpy arrays 或 pandas
-#     """
-#     sgd = SGDClassifier(loss="log_loss", penalty="l2", max_iter=1, tol=None, warm_start=True)
-#     # 先做标准化（增量），使用 StandardScaler.partial_fit
-#     scaler = StandardScaler()
-#     # partial fitting scaler in chunks to reduce mempeak
-#     n = X_train.shape[0]
-#     chunk = batch_size
-#     for i in range(0, n, chunk):
-#         scaler.partial_fit(X_train[i:i+chunk])
-#     X_train_scaled = scaler.transform(X_train)
-#     X_val_scaled = scaler.transform(X_val)
+# -------------------------
+# 5) SGDClassifier (incremental) 训练 & 测试 （Logistic Regression）
+# -------------------------
+def train_sgd_incremental(X_train, y_train, X_val, y_val, classes=[0,1,2], max_epochs=3, batch_size=100000):
+    """
+    使用 partial_fit 增量训练 SGDClassifier（适合大样本）。
+    X_train, y_train 可以是 numpy arrays 或 pandas
+    """
+    sgd = SGDClassifier(loss="log_loss", penalty="l2", max_iter=1, tol=None, warm_start=True)
+    # 先做标准化（增量），使用 StandardScaler.partial_fit
+    scaler = StandardScaler()
+    # partial fitting scaler in chunks to reduce mempeak
+    n = X_train.shape[0]
+    chunk = batch_size
+    for i in range(0, n, chunk):
+        scaler.partial_fit(X_train[i:i+chunk])
+    X_train_scaled = scaler.transform(X_train)
+    X_val_scaled = scaler.transform(X_val)
 
     # incremental training via partial_fit in chunks, for several epochs
     for epoch in range(max_epochs):

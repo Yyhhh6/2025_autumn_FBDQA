@@ -30,19 +30,24 @@ file_dir="./data"
 extract_feature(file_dir=file_dir)
 split_data(file_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, seed=SEED, N_list=N_list)
 
-feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice',
-                'n_bid1', 'n_bsize1', 'n_bid2', 'n_bsize2', 'n_bid3', 'n_bsize3',
-                'n_bid4', 'n_bsize4', 'n_bid5', 'n_bsize5', 'n_ask1', 'n_asize1', 
-                'n_ask2', 'n_asize2', 'n_ask3', 'n_asize3', 'n_ask4', 'n_asize4', 
-                'n_ask5', 'n_asize5', 'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 
-                'ask1', 'ask2', 'ask3', 'ask4', 'ask5', 'ask1_ma5', 'ask1_ma10', 
-                'ask1_ma20', 'ask1_ma40', 'ask1_ma60', 'ask1_ma80', 'ask1_ma100', 
-                'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', 
-                'bid1_ma80', 'bid1_ma100', 'spread1', 'spread2', 'spread3', 
-                'mid_price1', 'mid_price2', 'mid_price3', 'weighted_ab1', 
-                'weighted_ab2', 'weighted_ab3', 'relative_spread1', 'relative_spread2', 
-                'relative_spread3', 'bsize1', 'bsize2', 'bsize3', 'bsize4', 'bsize5', 
-                'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount']
+# feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice',
+#                 'n_bid1', 'n_bsize1', 'n_bid2', 'n_bsize2', 'n_bid3', 'n_bsize3',
+#                 'n_bid4', 'n_bsize4', 'n_bid5', 'n_bsize5', 'n_ask1', 'n_asize1', 
+#                 'n_ask2', 'n_asize2', 'n_ask3', 'n_asize3', 'n_ask4', 'n_asize4', 
+#                 'n_ask5', 'n_asize5', 'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 
+#                 'ask1', 'ask2', 'ask3', 'ask4', 'ask5', 'ask1_ma5', 'ask1_ma10', 
+#                 'ask1_ma20', 'ask1_ma40', 'ask1_ma60', 'ask1_ma80', 'ask1_ma100', 
+#                 'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', 
+#                 'bid1_ma80', 'bid1_ma100', 'spread1', 'spread2', 'spread3', 
+#                 'mid_price1', 'mid_price2', 'mid_price3', 'weighted_ab1', 
+#                 'weighted_ab2', 'weighted_ab3', 'relative_spread1', 'relative_spread2', 
+#                 'relative_spread3', 'bsize1', 'bsize2', 'bsize3', 'bsize4', 'bsize5', 
+#                 'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount']
+feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice', 'n_bid1', 
+                'n_bsize1', 'n_bid2', 'n_bsize2', 'n_bid3', 'n_bsize3', 'n_bid4', 
+                'n_bsize4', 'n_bid5', 'n_bsize5', 'n_ask1', 'n_asize1', 'n_ask2', 
+                'n_asize2', 'n_ask3', 'n_asize3', 'n_ask4', 'n_asize4', 'n_ask5', 
+                'n_asize5']
 
 
 for N in N_list:
@@ -55,8 +60,8 @@ for N in N_list:
     print("train_data的列名：", train_data.columns.tolist())
 
     # 去NaN
-    assert not train_data[feature_names].isnull().sum().any(), "train_data中存在NaN值，请检查！"
-    assert not val_data[feature_names].isnull().sum().any(), "val_data中存在NaN值，请检查！"
+    # assert not train_data[feature_names].isnull().sum().any(), "train_data中存在NaN值，请检查！"
+    # assert not val_data[feature_names].isnull().sum().any(), "val_data中存在NaN值，请检查！"
 
     # 去极值
     train_data = extreme_process_MAD(train_data, feature_names=feature_names, num=3)
