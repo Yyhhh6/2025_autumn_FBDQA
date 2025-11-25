@@ -56,19 +56,43 @@ for N in N_list:
     # 增加时间标签特征
     train_data['time_label'] = assign_tick_time_labels(train_data['time'])
     val_data['time_label'] = assign_tick_time_labels(val_data['time'])
+    test_data['time_label'] = assign_tick_time_labels(test_data['time'])
 
     print("train_data的列名：", train_data.columns.tolist())
 
-    # 去NaN
-    # assert not train_data[feature_names].isnull().sum().any(), "train_data中存在NaN值，请检查！"
-    # assert not val_data[feature_names].isnull().sum().any(), "val_data中存在NaN值，请检查！"
+    # 去NaN（包括时间标签处理）
+    # 处理时间标签的NaN值，使用0填充或删除
+    assert 'time_label' in train_data.columns, "train_data中缺少'time_label'列！"
+    assert 'time_label' in val_data.columns, "val_data中缺少'time_label'列！"
+    assert 'time_label' in test_data.columns, "test_data中缺少'time_label'列！"
+    # train_data['time_label'] = train_data['time_label'].fillna(0)
+    # val_data['time_label'] = val_data['time_label'].fillna(0)
+    # test_data['time_label'] = test_data['time_label'].fillna(0)
 
-    # 去极值
+    # 检查特征列中的NaN
+    train_nan_features = train_data[feature_names].isnull().sum()
+    val_nan_features = val_data[feature_names].isnull().sum()
+    test_nan_features = test_data[feature_names].isnull().sum()
+
+    if train_nan_features.any():
+        print(f"训练集NaN特征: {train_nan_features[train_nan_features > 0]}")
+        train_data = train_data.fillna(train_data[feature_names].mean())
+    if val_nan_features.any():
+        print(f"验证集NaN特征: {val_nan_features[val_nan_features > 0]}")
+        # 使用训练集的均值填充验证集
+        train_means = train_data[feature_names].mean()
+        val_data = val_data.fillna(train_means)
+    if test_nan_features.any():
+        print(f"测试集NaN特征: {test_nan_features[test_nan_features > 0]}")
+        # 使用训练集的均值填充测试集
+        train_means = train_data[feature_names].mean()
+        test_data = test_data.fillna(train_means)
+
+    # 去极值（基于训练集统计量）
     train_data = extreme_process_MAD(train_data, feature_names=feature_names, num=3)
     val_data = extreme_process_MAD(val_data, feature_names=feature_names, num=3)
+    test_data = extreme_process_MAD(test_data, feature_names=feature_names, num=3)
 
-    assert not train_data.isnull().any().any(), "train_data中存在NaN值，请检查！"
-    assert not val_data.isnull().any().any(), "val_data中存在NaN值，请检查！"
     def check_finite_pandas(df):   # 检查无限值和NaN值
         has_inf = np.isinf(df.select_dtypes(include=[np.number])).any().any()
         has_na = df.isna().any().any()
@@ -77,11 +101,13 @@ for N in N_list:
     # 修改断言
     assert check_finite_pandas(train_data), "train_data中存在inf或NaN值，请检查！"
     assert check_finite_pandas(val_data), "val_data中存在inf或NaN值，请检查！"
+    assert check_finite_pandas(test_data), "test_data中存在inf或NaN值，请检查！"
 
     # 归一化
     train_data[feature_names] = data_scale_Z_Score(train_data, feature_names=feature_names)
     val_data[feature_names] = data_scale_Z_Score(val_data, feature_names=feature_names)
+    test_data[feature_names] = data_scale_Z_Score(test_data, feature_names=feature_names)
 
-    results = run_pipeline(train_data, val_data, feature_names, N_list, alpha_map, out_dir="./results", device="cuda")
+    results = run_pipeline(train_data, val_data, test_data, feature_names, N_list, alpha_map, out_dir="./results", device="cuda")
     print(results)
     # exit()
