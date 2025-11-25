@@ -85,7 +85,7 @@ for N in N_list:
 
     print("train_data的列名：", train_data.columns.tolist())
 
-    # 去NaN（包括时间标签处理）
+    # 去NaN（包括时间标签检查）
     ## 处理时间标签的NaN值，使用0填充或删除
     assert 'time_label' in train_data.columns, "train_data中缺少'time_label'列！"
     assert 'time_label' in val_data.columns, "val_data中缺少'time_label'列！"
@@ -97,32 +97,35 @@ for N in N_list:
     # assert check_finite_pandas(train_data), "train_data中存在inf值，请检查！"
     # assert check_finite_pandas(val_data), "val_data中存在inf值，请检查！"
     # assert check_finite_pandas(test_data), "test_data中存在inf值，请检查！"
-    # assert check_nan_pandas(train_data), "train_data中存在NaN值，请检查！"
-    # assert check_nan_pandas(val_data), "val_data中存在NaN值，请检查！"
-    # assert check_nan_pandas(test_data), "test_data中存在NaN值，请检查！"
+    assert check_nan_pandas(train_data['time_label']), "train_data的time_label中存在NaN值，请检查！"
+    assert check_nan_pandas(val_data['time_label']), "val_data的time_label中存在NaN值，请检查！"
+    assert check_nan_pandas(test_data['time_label']), "test_data的time_label中存在NaN值，请检查！"
 
     ## 检查特征列中的NaN
     train_data = factors_null_process(train_data, feature_names=feature_names, class_name="训练集")
     val_data = factors_null_process(val_data, feature_names=feature_names, class_name="验证集")
     test_data = factors_null_process(test_data, feature_names=feature_names, class_name="测试集")
+    
+    # 去inf值
+    train_data, val_data, test_data = factors_inf_process(feature_names=feature_names, train=train_data, val=val_data, test=test_data)
 
     # 去极值（基于训练集统计量）
     train_data = extreme_process_MAD(train_data, feature_names=feature_names, num=3)
     val_data = extreme_process_MAD(val_data, feature_names=feature_names, num=3)
     test_data = extreme_process_MAD(test_data, feature_names=feature_names, num=3)
 
-    # 修改断言
+    # 归一化
+    train_data[feature_names] = data_scale_Z_Score(train_data, feature_names=feature_names)
+    val_data[feature_names] = data_scale_Z_Score(val_data, feature_names=feature_names)
+    test_data[feature_names] = data_scale_Z_Score(test_data, feature_names=feature_names)
+
+    # 断言
     assert check_finite_pandas(train_data), "train_data中存在inf值，请检查！"
     assert check_finite_pandas(val_data), "val_data中存在inf值，请检查！"
     assert check_finite_pandas(test_data), "test_data中存在inf值，请检查！"
     assert check_nan_pandas(train_data), "train_data中存在NaN值，请检查！"
     assert check_nan_pandas(val_data), "val_data中存在NaN值，请检查！"
     assert check_nan_pandas(test_data), "test_data中存在NaN值，请检查！"
-
-    # 归一化
-    train_data[feature_names] = data_scale_Z_Score(train_data, feature_names=feature_names)
-    val_data[feature_names] = data_scale_Z_Score(val_data, feature_names=feature_names)
-    test_data[feature_names] = data_scale_Z_Score(test_data, feature_names=feature_names)
 
     results = run_pipeline(train_data, val_data, test_data, feature_names, N_list, alpha_map, out_dir="./results", device="cuda")
     print(results)

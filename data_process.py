@@ -7,11 +7,21 @@ def check_finite_pandas(df):
 def check_nan_pandas(df):
     return not df.isna().any().any()
 
+def factors_inf_process(feature_names: list, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
+    medians = train[feature_names].median()
+
+    # 使用训练集的中位数填充 train/val/test
+    train[feature_names] = train[feature_names].fillna(medians)
+    val[feature_names] = val[feature_names].fillna(medians)
+    test[feature_names] = test[feature_names].fillna(medians)
+    
+    return train, val, test
+
 def factors_null_process(data: pd.DataFrame, feature_names: list, class_name: str) -> pd.DataFrame:
     data_nan_features = data[feature_names].isnull().sum()
     # TODO: 换为中位数？
     if data_nan_features.any():
-        print(f"{class_name}NaN特征: {data_nan_features[data_nan_features > 0]}")
+        # print(f"{class_name}NaN特征: {data_nan_features[data_nan_features > 0]}")
         data = data.fillna(data[feature_names].mean())
     return data
        
@@ -40,10 +50,10 @@ def data_scale_Z_Score(data, feature_names=None):
     if feature_names is not None:
         data_ = data[feature_names].copy()
         data_.loc[:, feature_names] = (
-            data_.loc[:, feature_names] - data_.loc[:, feature_names].mean()) / data_.loc[:, feature_names].std()
+            data_.loc[:, feature_names] - data_.loc[:, feature_names].mean()) / (data_.loc[:, feature_names].std() + 1e-10)
     else:
         data_ = data.copy()
-        data_ = (data_ - data_.mean()) / data_.std()
+        data_ = (data_ - data_.mean()) / (data_.std() + 1e-10)
     return data_
 
 def assign_tick_time_labels(tick_series: pd.Series) -> pd.Series:
