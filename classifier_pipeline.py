@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
-    classification_report, confusion_matrix
+    classification_report, confusion_matrix, fbeta_score
 )
 from sklearn.utils import shuffle
 import lightgbm as lgb
@@ -25,7 +25,7 @@ def classification_metrics(y_true, y_pred):
         "accuracy": accuracy_score(y_true, y_pred),
         "precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
         "recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
-        "f0.5_macro": fbeta_score(y_true, y_pred, average="macro", zero_division=0, beta=0.5),
+        "f0.5_macro": fbeta_score(y_true, y_pred, average="macro", beta=0.5, zero_division=0),
         "f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
         "confusion_matrix": confusion_matrix(y_true, y_pred)
     }
@@ -441,11 +441,146 @@ def run_pipeline(train_df: pd.DataFrame,
         print(f"MLP N={N} test f0.5_macro: {metrics_mlp['f0.5_macro']:.4f} precision_macro: {metrics_mlp['precision_macro']:.4f} recall_macro: {metrics_mlp['recall_macro']:.4f}")
         print(f"MLP N={N} PnL: {pnl_metrics_mlp['total_pnl']:,.0f} Return: {pnl_metrics_mlp['total_return']:.2%} Sharpe: {pnl_metrics_mlp['sharpe_ratio']:.2f} WinRate: {pnl_metrics_mlp['win_rate']:.2%}")
 
-        # 存储结果
+        # 存储结果（包含PNL）
         results[N] = {
             "lgb": (metrics_lgb, bst.best_iteration),
             "sgd": (metrics_sgd, None),
             "mlp": (metrics_mlp, model_path)
         }
 
+        # 打印PNL比较
+        print(f"\nPNL Comparison for N={N}:")
+        print(f"LightGBM: {pnl_lgb['bps_pnl']:>8.2f} bps, Sharpe: {pnl_lgb['sharpe_ratio']:>6.2f}")
+        print(f"SGD:      {pnl_sgd['bps_pnl']:>8.2f} bps, Sharpe: {pnl_sgd['sharpe_ratio']:>6.2f}")
+        print(f"MLP:      {pnl_mlp['bps_pnl']:>8.2f} bps, Sharpe: {pnl_mlp['sharpe_ratio']:>6.2f}")
+
+
     return results
+
+
+from typing import Dict, List, Tuple
+
+def calculate_pnl(test_df: pd.DataFrame, 
+                 predictions: np.ndarray,
+                 N: int,
+                 price_col: str = "n_close",
+                 return_col: str = "return",
+                 transaction_cost: float = 0.001) -> Dict[str, float]:
+    """
+    计算策略的PNL表现
+    
+    Args:
+        test_df: 测试数据集
+        predictions: 模型预测结果 (0: 跌, 1: 平, 2: 涨)
+        N: 预测周期
+        price_col: 价格列名
+        return_col: 收益率列名
+        transaction_cost: 交易成本（双边）
+    
+    Returns:
+        PNL相关指标的字典
+    """
+    # 复制数据避免修改原数据
+    df = test_df.copy()
+    
+    # 确保长度一致
+    assert len(df) == len(predictions), "预测结果长度与测试数据长度不匹配"
+
+    # 创建信号
+    # 2(涨) -> 做多, 0(跌) -> 做空, 1(平) -> 空仓
+    positions = np.zeros(len(predictions))
+    print(f"init {np.count_nonzero(positions)} positions")
+    positions[predictions == 2] = 1   # 做多
+    positions[predictions == 0] = -1  # 做空
+    
+    # 计算收益率
+    if return_col in df.columns:
+        returns = df[return_col].values
+    else:
+        # 如果没有收益率列，从价格计算
+        prices = df[price_col].values
+        returns = np.zeros(len(prices)-N)
+        print("prices:")
+        print(prices)
+        returns = (prices[N:] - prices[:-N])
+    print(f"Returns sample: {returns[:20]}")
+    assert len(returns) == len(positions) - N, "收益率长度与持仓长度不匹配"
+    strategy_returns = returns*positions[:len(returns)]
+    print(f"Strategy returns sample: {strategy_returns[:20]}")
+    cumulative_strategy_return = np.sum(strategy_returns)
+    cumulative_buy_hold_return = returns[-1]
+    trade_num = np.count_nonzero(positions) * 2  # 双边交易次数
+    total_transaction_cost = trade_num * transaction_cost
+    cumulative_strategy_return -= total_transaction_cost
+    bps_pnl = cumulative_strategy_return * 10000  # 转换为bps
+    print(f"bps_pnl: {bps_pnl}")
+    print(f"Cumulative strategy return: {cumulative_strategy_return:.4f}")
+    print(f"Cumulative buy-and-hold return: {cumulative_buy_hold_return:.4f}")
+    exit()
+    return {
+        "cumulative_return": cumulative_strategy_return,
+        "bps_pnl": bps_pnl,
+        "cumulative_buy_hold": cumulative_buy_hold_return,
+        "excess_return": cumulative_strategy_return - cumulative_buy_hold_return
+    }
+    # 计算策略收益（考虑N周期持有）
+    strategy_returns = np.zeros(len(returns))
+    
+    for i in range(len(returns) - N):
+        if positions[i] != 0:  # 有持仓
+            # 持有N周期的收益
+            hold_return = np.prod(1 + returns[i:i+N]) - 1
+            strategy_returns[i + N] = positions[i] * hold_return
+    
+    # 计算交易次数（仓位变化时交易）
+    trades = np.diff(positions, prepend=0) != 0
+    trade_count = np.sum(trades)
+    
+    # 扣除交易成本
+    total_transaction_cost = trade_count * transaction_cost
+    
+    # 计算净收益
+    net_strategy_returns = strategy_returns - (trades * transaction_cost)
+    
+    # 计算累计收益
+    net_strategy_returns_not_zero = net_strategy_returns[net_strategy_returns != 0]
+    print(f"Net strategy returns sample: {net_strategy_returns_not_zero}")
+    print(f"number of trades: {trade_count}")
+    print(f"number of net_strategy_returns_not_zero: {len(net_strategy_returns_not_zero)}")
+    print(f"Returns sample: {returns[:20]}")
+    
+    cumulative_strategy_return = np.prod(1 + net_strategy_returns) - 1
+    cumulative_buy_hold_return = np.prod(1 + returns) - 1
+    print(f"Cumulative strategy return: {cumulative_strategy_return:.4f}")
+    print(f"Cumulative buy-and-hold return: {cumulative_buy_hold_return:.4f}")
+    exit()
+    # 计算年化收益（假设252个交易日）
+    days = len(returns)
+    annualized_strategy = (1 + cumulative_strategy_return) ** (252/days) - 1 if days > 0 else 0
+    annualized_bh = (1 + cumulative_buy_hold_return) ** (252/days) - 1 if days > 0 else 0
+    
+    # 计算bps PNL（相对于初始本金的收益率，以bps表示）
+    bps_pnl = cumulative_strategy_return * 10000  # 转换为bps
+    
+    # 计算夏普比率
+    excess_returns = net_strategy_returns - returns
+    sharpe_ratio = np.mean(excess_returns) / np.std(excess_returns) * np.sqrt(252) if np.std(excess_returns) > 0 else 0
+    
+    # 最大回撤
+    cumulative_returns = np.cumprod(1 + net_strategy_returns)
+    running_max = np.maximum.accumulate(cumulative_returns)
+    drawdown = (cumulative_returns - running_max) / running_max
+    max_drawdown = np.min(drawdown)
+    
+    return {
+        "cumulative_return": cumulative_strategy_return,
+        "annualized_return": annualized_strategy,
+        "bps_pnl": bps_pnl,
+        "sharpe_ratio": sharpe_ratio,
+        "max_drawdown": max_drawdown,
+        "trade_count": trade_count,
+        "win_rate": np.mean(net_strategy_returns > 0) if len(net_strategy_returns) > 0 else 0,
+        "total_transaction_cost": total_transaction_cost,
+        "cumulative_buy_hold": cumulative_buy_hold_return,
+        "excess_return": cumulative_strategy_return - cumulative_buy_hold_return
+    }
