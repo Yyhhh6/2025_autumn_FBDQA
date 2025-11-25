@@ -1,91 +1,1186 @@
-步骤1: 加载和划分数据...
-train shape: (2426786, 31), val shape: (613693, 31)
+train_data的列名： ['date', 'time', 'sym', 'n_close', 'amount_delta', 'n_midprice', 'n_bid1', 'n_bsize1', 'n_bid2', 'n_bsize2', 'n_bid3', 'n_bsize3', 'n_bid4', 'n_bsize4', 'n_bid5', 'n_bsize5', 'n_ask1', 'n_asize1', 'n_ask2', 'n_asize2', 'n_ask3', 'n_asize3', 'n_ask4', 'n_asize4', 'n_ask5', 'n_asize5', 'label_5', 'label_10', 'label_20', 'label_40', 'label_60', 'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 'ask1', 'ask2', 'ask3', 'ask4', 'ask5', 'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 'ask1_ma40', 'ask1_ma60', 'ask1_ma80', 'ask1_ma100', 'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', 'bid1_ma80', 'bid1_ma100', 'spread1', 'spread2', 'spread3', 'mid_price1', 'mid_price2', 'mid_price3', 'weighted_ab1', 'weighted_ab2', 'weighted_ab3', 'relative_spread1', 'relative_spread2', 'relative_spread3', 'bsize1', 'bsize2', 'bsize3', 'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount', 'ofi', 'ofi_ma5', 'ofi_ma20', 'ofi_ma50', 'ofi_trend_10', 'obi1', 'obi3', 'obi1_ma10', 'obi3_ma10', 'obi1_ma30', 'microprice', 'microprice_change', 'microprice_change_ma5', 'microprice_deviation', 'microprice_deviation_ma10', 'kyle_lambda', 'kyle_lambda_ma10', 'kyle_lambda_ma30', 'realized_vol_5', 'realized_vol_10', 'realized_vol_20', 'realized_vol_50', 'vol_change', 'vol_ratio', 'momentum_5', 'momentum_10', 'momentum_20', 'reversal_3', 'reversal_5', 'price_acceleration', 'effective_spread', 'effective_spread_ma10', 'effective_spread_ma30', 'spread_change', 'spread_volatility', 'volume_ratio_10', 'volume_ratio_30', 'volume_surge', 'volume_surge_ma10', 'short_rsi', 'price_momentum_3', 'price_momentum_5', 'bid_depth_3', 'ask_depth_3', 'depth_imbalance_3', 'bid_depth_change', 'ask_depth_change', 'bid_pressure', 'ask_pressure', 'bid_skew', 'ask_skew', 'price_mean_100', 'price_std_100', 'price_max_100', 'price_min_100', 'price_range_100', 'price_position', 'volume_mean_100', 'volume_std_100', 'spread_mean_100', 'spread_std_100', 'time_label']
 
-步骤2: 执行数据分布分析...
-可用的重要特征: ['n_close', 'amount_delta', 'n_midprice', 'n_bid1', 'n_ask1', 'n_bsize1', 'n_asize1', 'n_bid5', 'n_ask5']
-============================================================
-数据基本信息
-============================================================
-
-训练集基本信息:
-            n_close  amount_delta    n_midprice        n_bid1        n_ask1      n_bsize1      n_asize1        n_bid5        n_ask5
-count  2.426786e+06  2.426786e+06  2.426786e+06  2.426786e+06  2.426786e+06  2.426786e+06  2.426786e+06  2.426786e+06  2.426786e+06
-mean   3.639054e-03  4.789571e+05  3.623192e-03  3.123271e-03  3.320680e-03  1.116080e-04  5.126315e-05 -1.509059e-03  7.793916e-03
-std    2.442318e-02  1.717437e+06  2.439758e-02  2.416241e-02  2.256474e-02  8.770205e-04  1.952978e-04  2.480244e-02  2.289663e-02
-min   -1.001495e-01  0.000000e+00 -1.001495e-01 -1.001495e-01 -1.001495e-01  0.000000e+00  0.000000e+00 -1.001495e-01 -9.865471e-02
-25%   -9.900990e-03  6.547250e+03 -9.785203e-03 -1.044841e-02 -9.259259e-03  1.363093e-06  1.296601e-06 -1.559282e-02 -5.498822e-03
-50%    2.084781e-03  8.371000e+04  1.901141e-03  1.218027e-03  2.352941e-03  6.536321e-06  6.302269e-06 -2.624672e-03  6.552007e-03
-75%    1.463964e-02  3.990558e+05  1.456935e-02  1.401869e-02  1.456816e-02  3.229188e-05  2.998514e-05  1.004464e-02  1.956400e-02
-max    1.005464e-01  8.991515e+08  1.005464e-01  1.005464e-01  1.005464e-01  2.775392e-02  5.535796e-03  9.922514e-02  1.002695e-01
-
-验证集基本信息:
-             n_close  amount_delta     n_midprice         n_bid1         n_ask1      n_bsize1       n_asize1         n_bid5         n_ask5
-count  613693.000000  6.136930e+05  613693.000000  613693.000000  613693.000000  6.136930e+05  613693.000000  613693.000000  613693.000000
-mean        0.003467  4.960987e+05       0.003468       0.002890       0.003167  1.443398e-04       0.000042      -0.001424       0.007461
-std         0.024484  5.616337e+06       0.024462       0.024503       0.022710  1.296408e-03       0.000099       0.025129       0.023235
-min        -0.089286  0.000000e+00      -0.088955      -0.089286      -0.088624  1.094077e-10       0.000000      -0.093915      -0.085979
-25%        -0.009804  8.806000e+03      -0.009398      -0.010025      -0.009091  1.324041e-06       0.000001      -0.015487      -0.005666
-50%         0.002792  9.683200e+04       0.002527       0.002227       0.002948  6.017470e-06       0.000006      -0.002038       0.006535
-75%         0.015070  4.118690e+05       0.015186       0.014352       0.015094  2.926657e-05       0.000028       0.011151       0.020247
-max         0.100277  3.440177e+09       0.100277       0.100277       0.100277  2.246036e-02       0.002902       0.099132       0.100277
-
-训练集缺失值统计:
-n_close         0
-amount_delta    0
-n_midprice      0
-n_bid1          0
-n_ask1          0
-n_bsize1        0
-n_asize1        0
-n_bid5          0
-n_ask5          0
-dtype: int64
-
-验证集缺失值统计:
-n_close         0
-amount_delta    0
-n_midprice      0
-n_bid1          0
-n_ask1          0
-n_bsize1        0
-n_asize1        0
-n_bid5          0
-n_ask5          0
-dtype: int64
-
-============================================================
-数据分布相似性分析
-============================================================
-
-特征分布相似性排序 (KS统计量越大，分布差异越大):
-             ks_statistic ks_pvalue similar_distribution
-amount_delta     0.023111       0.0                False
-n_bid1           0.020785       0.0                False
-n_midprice        0.02062       0.0                False
-n_bid5           0.019798       0.0                False
-n_ask1           0.019055       0.0                False
-n_close          0.018332       0.0                False
-n_asize1         0.015839       0.0                False
-n_bsize1         0.014845       0.0                False
-n_ask5           0.014786       0.0                False
-
-步骤3: 绘制特征分布图...
-特征分布图已保存: feature_distributions.png
-
-步骤4: 绘制相关性对比图...
-相关性对比图已保存: correlation_comparison.png
-
-相关性矩阵平均绝对差异: 0.03110360189230796
-相关性矩阵最大差异: 0.18684363800879158
-
-步骤5: 评估数据划分质量...
-
-============================================================
-数据划分质量评估
-============================================================
-总特征数量: 9
-分布相似的特征数量: False
-分布相似性比例: 0.00%
-❌ 数据划分质量: 较差 - 训练集和验证集分布差异较大
-
-分布差异最大的5个特征:
+========================================
+Start training for N=5
+effective samples -> train: 2020070 val: 795900 test: 66325
+Training LightGBM (GPU)...
+[LightGBM] [Info] This is the GPU trainer!!
+[LightGBM] [Info] Total Bins 31611
+[LightGBM] [Info] Number of data points in the train set: 2020070, number of used features: 125
+[LightGBM] [Info] Using requested OpenCL platform 0 device 0
+[LightGBM] [Info] Using GPU Device: NVIDIA A800 80GB PCIe, Vendor: NVIDIA Corporation
+[LightGBM] [Info] Compiling OpenCL Kernel with 256 bins...
+[LightGBM] [Info] GPU programs have been built
+[LightGBM] [Info] Size of histogram bin entry: 8
+[LightGBM] [Info] 125 dense feature groups (246.59 MB) transferred to GPU in 0.892421 secs. 0 sparse feature groups
+[LightGBM] [Info] Start training from score -1.878608
+[LightGBM] [Info] Start training from score -0.361709
+[LightGBM] [Info] Start training from score -1.892381
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+Training until validation scores don't improve for 50 rounds
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 8
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 9
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 26
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 22
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 22
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 25
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 10
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 22
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 21
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 19
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 20
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 22
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 11
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 12
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 13
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 16
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 17
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 18
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 14
+[LightGBM] [Debug] Trained a tree with leaves = 64 and depth = 15
+Early stopping, best iteration is:
+[304]	valid's multi_logloss: 0.608008
+n_close_origin length: 66325
+0    0.005319
+1    0.005319
+2    0.005319
+3    0.005319
+4    0.005319
+Name: n_close_origin, dtype: float64
+price_changes description:
+count    6.632500e+04
+mean     4.108741e-07
+std      1.306007e-03
+min     -9.356473e-02
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      6.797711e-02
+dtype: float64
+positions==1 sum: 5356
+positions==-1 sum: 4661
+positions==0 sum: 56308
+LightGBM N=5 test f0.5_macro: 0.5623 precision_macro: 0.6072 recall_macro: 0.4911
+LightGBM N=5 PnL: -3,916 Return: -39.16% Sharpe: -6.66 WinRate: 29.76%
+Training SGDClassifier (incremental logistic)...
+[SGD] epoch 0 val f0.5_macro = 0.4924 precision_macro = 0.5583 recall_macro = 0.4317
+[SGD] epoch 1 val f0.5_macro = 0.5007 precision_macro = 0.5516 recall_macro = 0.4419
+[SGD] epoch 2 val f0.5_macro = 0.5068 precision_macro = 0.5726 recall_macro = 0.4399
+n_close_origin length: 66325
+0    0.005319
+1    0.005319
+2    0.005319
+3    0.005319
+4    0.005319
+Name: n_close_origin, dtype: float64
+price_changes description:
+count    6.632500e+04
+mean     4.108741e-07
+std      1.306007e-03
+min     -9.356473e-02
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      6.797711e-02
+dtype: float64
+positions==1 sum: 4823
+positions==-1 sum: 3696
+positions==0 sum: 57806
+SGD N=5 test f0.5_macro: 0.5211 precision_macro: 0.5759 recall_macro: 0.4551
+SGD N=5 PnL: -1,621 Return: -16.21% Sharpe: -2.29 WinRate: 30.55%
+Training PyTorch MLP...
+[PyTorch] Epoch 0 train_loss=0.6486 val_f0.5_macro=0.5665 precision_macro=0.6157 recall_macro=0.4914
+[PyTorch] Epoch 1 train_loss=0.6281 val_f0.5_macro=0.5707 precision_macro=0.6214 recall_macro=0.4937
+[PyTorch] Epoch 2 train_loss=0.6234 val_f0.5_macro=0.5757 precision_macro=0.6214 recall_macro=0.5013
+[PyTorch] Epoch 3 train_loss=0.6207 val_f0.5_macro=0.5764 precision_macro=0.6247 recall_macro=0.4998
+[PyTorch] Epoch 4 train_loss=0.6187 val_f0.5_macro=0.5807 precision_macro=0.6184 recall_macro=0.5137
+[PyTorch] Epoch 5 train_loss=0.6172 val_f0.5_macro=0.5795 precision_macro=0.6238 recall_macro=0.5053
+[PyTorch] Epoch 6 train_loss=0.6156 val_f0.5_macro=0.5790 precision_macro=0.6268 recall_macro=0.5029
+[PyTorch] Epoch 7 train_loss=0.6145 val_f0.5_macro=0.5793 precision_macro=0.6276 recall_macro=0.5019
+[PyTorch] Epoch 8 train_loss=0.6134 val_f0.5_macro=0.5812 precision_macro=0.6225 recall_macro=0.5097
+[PyTorch] Epoch 9 train_loss=0.6122 val_f0.5_macro=0.5822 precision_macro=0.6268 recall_macro=0.5073
+[PyTorch] Epoch 10 train_loss=0.6113 val_f0.5_macro=0.5827 precision_macro=0.6279 recall_macro=0.5074
+[PyTorch] Epoch 11 train_loss=0.6103 val_f0.5_macro=0.5798 precision_macro=0.6301 recall_macro=0.5008
+[PyTorch] Epoch 12 train_loss=0.6095 val_f0.5_macro=0.5858 precision_macro=0.6255 recall_macro=0.5146
+[PyTorch] Epoch 13 train_loss=0.6087 val_f0.5_macro=0.5812 precision_macro=0.6296 recall_macro=0.5038
+[PyTorch] Epoch 14 train_loss=0.6080 val_f0.5_macro=0.5836 precision_macro=0.6254 recall_macro=0.5110
+[PyTorch] Epoch 15 train_loss=0.6072 val_f0.5_macro=0.5823 precision_macro=0.6260 recall_macro=0.5083
+[PyTorch] Epoch 16 train_loss=0.6064 val_f0.5_macro=0.5839 precision_macro=0.6273 recall_macro=0.5101
+[PyTorch] Epoch 17 train_loss=0.6057 val_f0.5_macro=0.5872 precision_macro=0.6208 recall_macro=0.5232
+[PyTorch] Epoch 18 train_loss=0.6052 val_f0.5_macro=0.5876 precision_macro=0.6226 recall_macro=0.5214
+[PyTorch] Epoch 19 train_loss=0.6046 val_f0.5_macro=0.5847 precision_macro=0.6271 recall_macro=0.5118
+[PyTorch] Epoch 20 train_loss=0.6037 val_f0.5_macro=0.5855 precision_macro=0.6233 recall_macro=0.5166
+[PyTorch] Epoch 21 train_loss=0.6033 val_f0.5_macro=0.5851 precision_macro=0.6272 recall_macro=0.5118
+[PyTorch] Epoch 22 train_loss=0.6028 val_f0.5_macro=0.5867 precision_macro=0.6218 recall_macro=0.5200
+[PyTorch] Epoch 23 train_loss=0.6020 val_f0.5_macro=0.5853 precision_macro=0.6273 recall_macro=0.5123
+Early stopping.
+n_close_origin length: 66325
+0    0.005319
+1    0.005319
+2    0.005319
+3    0.005319
+4    0.005319
+Name: n_close_origin, dtype: float64
+price_changes description:
+count    6.632500e+04
+mean     4.108741e-07
+std      1.306007e-03
+min     -9.356473e-02
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      6.797711e-02
+dtype: float64
+positions==1 sum: 5676
+positions==-1 sum: 5387
+positions==0 sum: 55262
+MLP N=5 test f0.5_macro: 0.5932 precision_macro: 0.6319 recall_macro: 0.5218
+MLP N=5 PnL: -2,231 Return: -22.31% Sharpe: -3.50 WinRate: 38.60%
+{5: {'lgb': ({'accuracy': 0.7372483980399548, 'precision_macro': 0.6071866640683541, 'recall_macro': 0.4911087261619469, 'f0.5_macro': 0.5622725056822476, 'f1_macro': 0.5211558817270918, 'confusion_matrix': array([[ 2432,  6293,   633],
+       [ 1718, 43657,  1914],
+       [  511,  6358,  2809]]), 'pnl_total_pnl': np.float64(-3916.1097534837572), 'pnl_total_return': np.float64(-0.39161097534837574), 'pnl_annual_return': np.float64(-0.9340515701121823), 'pnl_sharpe_ratio': np.float64(-6.6609641909399615), 'pnl_max_drawdown': np.float64(-0.40676849250314223), 'pnl_win_rate': np.float64(0.297554347826087), 'pnl_total_trades': np.float64(8832.0), 'pnl_winning_trades': np.int64(2628), 'pnl_losing_trades': np.int64(7591), 'pnl_avg_win': np.float64(0.001207476740358293), 'pnl_avg_loss': np.float64(-0.00048158952051096824), 'pnl_profit_loss_ratio': np.float64(2.507273702876997), 'pnl_volatility': np.float64(0.0006579031036258388), 'pnl_long_only_return': np.float64(-0.010846936250713646), 'pnl_long_only_sharpe': np.float64(-0.14822585421572843), 'pnl_position_coverage': np.float64(0.15102902374670185), 'pnl_trading_frequency': np.float64(0.13316245759517528)}, 304), 'sgd': ({'accuracy': 0.7282321899736148, 'precision_macro': 0.575942875703371, 'recall_macro': 0.4550710779299192, 'f0.5_macro': 0.5210951708796782, 'f1_macro': 0.47818560329318344, 'confusion_matrix': array([[ 1765,  6818,   775],
+       [ 1392, 44192,  1705],
+       [  539,  6796,  2343]]), 'pnl_total_pnl': np.float64(-1620.9020114106354), 'pnl_total_return': np.float64(-0.16209020114106354), 'pnl_annual_return': np.float64(-0.6199910551404847), 'pnl_sharpe_ratio': np.float64(-2.2930932255643706), 'pnl_max_drawdown': np.float64(-0.2193858618091193), 'pnl_win_rate': np.float64(0.30551222048881954), 'pnl_total_trades': np.float64(7692.0), 'pnl_winning_trades': np.int64(2350), 'pnl_losing_trades': np.int64(6163), 'pnl_avg_win': np.float64(0.001214872459453622), 'pnl_avg_loss': np.float64(-0.0004896820927861253), 'pnl_profit_loss_ratio': np.float64(2.4809411602973044), 'pnl_volatility': np.float64(0.0006454532373335512), 'pnl_long_only_return': np.float64(0.03304638976096519), 'pnl_long_only_sharpe': np.float64(0.9116456073363713), 'pnl_position_coverage': np.float64(0.12844327176781004), 'pnl_trading_frequency': np.float64(0.11597436863927629)}, None), 'mlp': ({'accuracy': 0.7499886920467396, 'precision_macro': 0.6318634718809566, 'recall_macro': 0.521781697873499, 'f0.5_macro': 0.5932216109769088, 'f1_macro': 0.5546374371535452, 'confusion_matrix': array([[ 2927,  5724,   707],
+       [ 1894, 43621,  1774],
+       [  566,  5917,  3195]]), 'pnl_total_pnl': np.float64(-2230.744448023001), 'pnl_total_return': np.float64(-0.2230744448023001), 'pnl_annual_return': np.float64(-0.7486728455433573), 'pnl_sharpe_ratio': np.float64(-3.501427730241328), 'pnl_max_drawdown': np.float64(-0.27590362284817843), 'pnl_win_rate': np.float64(0.3859606509594365), 'pnl_total_trades': np.float64(8234.0), 'pnl_winning_trades': np.int64(3178), 'pnl_losing_trades': np.int64(7633), 'pnl_avg_win': np.float64(0.0010047490113161944), 'pnl_avg_loss': np.float64(-0.00044968771344991947), 'pnl_profit_loss_ratio': np.float64(2.234326136260093), 'pnl_volatility': np.float64(0.0006209204923162278), 'pnl_long_only_return': np.float64(0.10587591352488568), 'pnl_long_only_sharpe': np.float64(2.3080657392163206), 'pnl_position_coverage': np.float64(0.16679984922728985), 'pnl_trading_frequency': np.float64(0.12414624952883528)}, './results/mlp_N5.pt')}}

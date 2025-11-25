@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
-    classification_report, confusion_matrix
+    classification_report, confusion_matrix, fbeta_score
 )
 from sklearn.utils import shuffle
 import lightgbm as lgb
@@ -25,81 +25,202 @@ def classification_metrics(y_true, y_pred):
         "accuracy": accuracy_score(y_true, y_pred),
         "precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
         "recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
-        "f0.5_macro": fbeta_score(y_true, y_pred, average="macro", zero_division=0, beta=0.5),
+        "f0.5_macro": fbeta_score(y_true, y_pred, average="macro", beta=0.5, zero_division=0),
         "f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
         "confusion_matrix": confusion_matrix(y_true, y_pred)
     }
     return metrics
 
-# # -------------------------
-# # 4) LightGBM (GPU) 训练 & 测试
-# # -------------------------
-# def train_lightgbm_gpu(X_train, y_train, X_val, y_val, feature_names, save_path="lgb_model.txt",
-#                        num_class=3, params_override=None):
-#     # 转 np.ndarray (float32/int32)
-#     X_train = X_train.astype("float32")
-#     X_val = X_val.astype("float32")
+def calculate_pnl_metrics(y_pred, n_close_origin=None,
+                          initial_capital=10000, transaction_cost=0.0001):
+    """
+    计算量化交易的PnL相关指标
 
-#     lgb_params = {
-#         "objective": "multiclass",
-#         "num_class": num_class,
-#         "metric": "multi_logloss",
-#         "learning_rate": 0.05,
-#         "num_leaves": 64, # TODO：调整模型的拟合能力，越大能拟合更多的非线性
-#         "max_depth": -1,
-#         "device": "gpu",
-#         "gpu_platform_id": 0,
-#         "gpu_device_id": 0,
-#         "early_stopping_rounds": 50,
-#         "verbosity": 100
-#     }
-#     if params_override:
-#         lgb_params.update(params_override)
+    Parameters:
+    y_true: 真实标签 (0=跌, 1=平, 2=涨)
+    y_pred: 预测标签
+    mid_prices: 中间价序列 (可选，用于计算实际收益)
+    price_changes: 价格变化率 (可选，如果mid_prices为None时使用)
+    initial_capital: 初始资金
+    transaction_cost: 交易成本率
 
-#     dtrain = lgb.Dataset(X_train, label=y_train, feature_name=feature_names) # TODO：随机划分？
-#     dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
+    Returns:
+    dict: PnL相关指标
+    """
+    # TODO: 如果不除以mid_prices[:-1]，而是直接用价格相对于开盘的差值，后面是否直接加和就行？
+    price = (1 + n_close_origin)
+    price_changes = price.pct_change().fillna(0).values
 
-#     bst = lgb.train(
-#         lgb_params,
-#         dtrain,
-#         valid_sets=[dval],
-#         valid_names=["valid"],
-#         num_boost_round=2000,
-#     )
-#     bst.save_model(save_path)
-#     return bst
+    # print(f"n_close_origin length: {len(n_close_origin)}")
+    # print(n_close_origin.head())
+    # print(f"price_changes description:\n{pd.Series(price_changes).describe()}")
 
-# # -------------------------
-# # 5) SGDClassifier (incremental) 训练 & 测试 （Logistic Regression）
-# # -------------------------
-# def train_sgd_incremental(X_train, y_train, X_val, y_val, classes=[0,1,2], max_epochs=3, batch_size=100000):
-#     """
-#     使用 partial_fit 增量训练 SGDClassifier（适合大样本）。
-#     X_train, y_train 可以是 numpy arrays 或 pandas
-#     """
-#     sgd = SGDClassifier(loss="log_loss", penalty="l2", max_iter=1, tol=None, warm_start=True)
-#     # 先做标准化（增量），使用 StandardScaler.partial_fit
-#     scaler = StandardScaler()
-#     # partial fitting scaler in chunks to reduce mempeak
-#     n = X_train.shape[0]
-#     chunk = batch_size
-#     for i in range(0, n, chunk):
-#         scaler.partial_fit(X_train[i:i+chunk])
-#     X_train_scaled = scaler.transform(X_train)
-#     X_val_scaled = scaler.transform(X_val)
+    # 构建交易信号
+    # 只在预测为涨(2)时做多，预测为跌(0)时做空，预测为平(1)时不交易
+    positions = np.zeros(len(y_pred))
+    positions[y_pred == 2] = 1   # 做多
+    positions[y_pred == 0] = -1  # 做空
+    positions[y_pred == 1] = 0   # 不交易
+    # print("positions==1 sum:", np.sum(positions==1))
+    # print("positions==-1 sum:", np.sum(positions==-1))
+    # print("positions==0 sum:", np.sum(positions==0))
 
-#     # incremental training via partial_fit in chunks, for several epochs
-#     for epoch in range(max_epochs):
-#         # shuffle
-#         Xs, ys = shuffle(X_train_scaled, y_train, random_state=epoch)
-#         for i in range(0, Xs.shape[0], chunk):
-#             Xb = Xs[i:i+chunk]
-#             yb = ys[i:i+chunk]
-#             sgd.partial_fit(Xb, yb, classes=classes)
-#         # optional: evaluate per epoch
-#         val_pred = sgd.predict(X_val_scaled)
-#         print(f"[SGD] epoch {epoch} val f0.5_macro = {fbeta_score(y_val, val_pred, average='macro', zero_division=0, beta=0.5):.4f} precision_macro = {precision_score(y_val, val_pred, average='macro', zero_division=0):.4f} recall_macro = {recall_score(y_val, val_pred, average='macro', zero_division=0):.4f}")
-#     return sgd, scaler
+    # 计算每期收益（考虑交易成本）
+    returns = positions * price_changes
+
+    # 计算交易成本（只在仓位变化时产生）
+    position_changes = np.abs(np.diff(positions))
+    trading_costs = position_changes * transaction_cost
+    trading_costs = np.append(trading_costs, 0)  # 末尾填充0
+
+    # 净收益
+    net_returns = returns - trading_costs
+
+    # 累计收益
+    cumulative_returns = np.cumprod(1 + net_returns)
+
+    # PnL计算
+    pnl_bps = initial_capital * (cumulative_returns - 1)
+
+    # 基础统计
+    total_trades = np.sum(position_changes)
+    winning_trades = np.sum(net_returns > 0)
+    losing_trades = np.sum(net_returns < 0)
+
+    # 计算各项指标
+    total_return = cumulative_returns[-1] - 1
+    annual_return = (1 + total_return) ** (252 * 1440 / len(y_pred)) - 1  # 假设每分钟一个tick
+
+    # 夏普比率（假设无风险利率为0）
+    returns_std = np.std(net_returns)
+    sharpe_ratio = np.mean(net_returns) / returns_std * np.sqrt(252 * 1440) if returns_std > 0 else 0
+
+    # 最大回撤
+    peak = np.maximum.accumulate(cumulative_returns)
+    drawdown = (cumulative_returns - peak) / peak
+    max_drawdown = np.min(drawdown)
+
+    # 胜率
+    win_rate = winning_trades / total_trades if total_trades > 0 else 0
+
+    # 平均盈亏比
+    avg_win = np.mean(net_returns[net_returns > 0]) if winning_trades > 0 else 0
+    avg_loss = np.mean(net_returns[net_returns < 0]) if losing_trades > 0 else 0
+    profit_loss_ratio = abs(avg_win / avg_loss) if avg_loss != 0 else np.inf
+
+    # 计算只交易上涨方向的PnL（更保守的策略）
+    long_only_positions = np.where(y_pred == 2, 1, 0)  # 只在预测上涨时做多
+    long_only_returns = long_only_positions * price_changes
+    long_only_position_changes = np.abs(np.diff(long_only_positions))
+    long_only_trading_costs = long_only_position_changes * transaction_cost
+    long_only_trading_costs = np.append(long_only_trading_costs, 0)
+    long_only_net_returns = long_only_returns - long_only_trading_costs
+    long_only_cumulative_returns = np.cumprod(1 + long_only_net_returns)
+    long_only_total_return = long_only_cumulative_returns[-1] - 1
+
+    return {
+        "total_pnl": pnl_bps[-1],
+        "total_return": total_return,
+        "annual_return": annual_return,
+        "sharpe_ratio": sharpe_ratio,
+        "max_drawdown": max_drawdown,
+        "win_rate": win_rate,
+        "total_trades": total_trades,
+        "winning_trades": winning_trades,
+        "losing_trades": losing_trades,
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "profit_loss_ratio": profit_loss_ratio,
+        "volatility": returns_std,
+        "long_only_return": long_only_total_return,  # 保守策略收益
+        "long_only_sharpe": (np.mean(long_only_net_returns) / np.std(long_only_net_returns) * np.sqrt(252 * 1440)
+                           if np.std(long_only_net_returns) > 0 else 0),
+        "position_coverage": np.mean(np.abs(positions)),  # 仓位覆盖率
+        "trading_frequency": total_trades / len(y_pred),  # 交易频率
+    }
+
+# -------------------------
+# 4) LightGBM (GPU) 训练 & 测试
+# -------------------------
+def train_lightgbm_gpu(X_train, y_train, X_val, y_val, feature_names, save_path="lgb_model.txt",
+                       num_class=3, params_override=None):
+    # 转 np.ndarray (float32/int32)
+    X_train = X_train.astype("float32")
+    X_val = X_val.astype("float32")
+
+    lgb_params = {
+        "objective": "multiclass",
+        "num_class": num_class,
+        "metric": "multi_logloss",
+        "learning_rate": 0.05,
+        "num_leaves": 64, # TODO：调整模型的拟合能力，越大能拟合更多的非线性
+        "max_depth": -1,
+        "device": "gpu",
+        "gpu_platform_id": 0,
+        "gpu_device_id": 0,
+        "early_stopping_rounds": 50,
+        "verbosity": 100
+    }
+    if params_override:
+        lgb_params.update(params_override)
+
+    dtrain = lgb.Dataset(X_train, label=y_train, feature_name=feature_names) # TODO：随机划分？
+    dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
+
+    bst = lgb.train(
+        lgb_params,
+        dtrain,
+        valid_sets=[dval],
+        valid_names=["valid"],
+        num_boost_round=2000,
+    )
+    bst.save_model(save_path)
+    return bst
+
+# -------------------------
+# 5) SGDClassifier (incremental) 训练 & 测试 （Logistic Regression）
+# -------------------------
+def train_sgd_incremental(X_train, y_train, X_val, y_val, classes=[0,1,2], max_epochs=3, batch_size=100000):
+    """
+    使用 partial_fit 增量训练 SGDClassifier（适合大样本）。
+    重要：假设输入数据已经经过标准化处理，避免重复标准化
+    """
+    sgd = SGDClassifier(loss="log_loss", penalty="l2", max_iter=1, tol=None, warm_start=True, random_state=42)
+
+    # 假设数据已经标准化，直接使用
+    X_train_scaled = X_train
+    X_val_scaled = X_val
+    scaler = None  # 不再需要scaler，因为数据已预处理
+
+    # incremental training via partial_fit in chunks, for several epochs
+    best_val_f0_5 = -np.inf
+    best_sgd = None
+
+    for epoch in range(max_epochs):
+        # shuffle
+        Xs, ys = shuffle(X_train_scaled, y_train, random_state=epoch)
+        for i in range(0, Xs.shape[0], chunk := batch_size):
+            Xb = Xs[i:i+chunk]
+            yb = ys[i:i+chunk]
+            if i == 0:  # 第一次训练时需要指定classes
+                sgd.partial_fit(Xb, yb, classes=classes)
+            else:
+                sgd.partial_fit(Xb, yb)
+
+        # evaluate per epoch
+        val_pred = sgd.predict(X_val_scaled)
+        val_f0_5 = fbeta_score(y_val, val_pred, average='macro', zero_division=0, beta=0.5)
+        val_precision = precision_score(y_val, val_pred, average='macro', zero_division=0)
+        val_recall = recall_score(y_val, val_pred, average='macro', zero_division=0)
+
+        print(f"[SGD] epoch {epoch} val f0.5_macro = {val_f0_5:.4f} precision_macro = {val_precision:.4f} recall_macro = {val_recall:.4f}")
+
+        # 保存最佳模型
+        if val_f0_5 > best_val_f0_5:
+            best_val_f0_5 = val_f0_5
+            best_sgd = sgd
+
+    return best_sgd, scaler
 
 # -------------------------
 # 6) PyTorch MLP（GPU）训练 & 测试
@@ -135,11 +256,10 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val,
                       batch_size=8192, epochs=20, patience=5,
                       model_path="mlp_best.pt"):
 
-    # Standardize (fit on train)
-    scaler = StandardScaler()
-    scaler.fit(X_train)
-    X_train_s = scaler.transform(X_train).astype(np.float32)
-    X_val_s = scaler.transform(X_val).astype(np.float32)
+    # 假设数据已经标准化，直接使用
+    X_train_s = X_train.astype(np.float32)
+    X_val_s = X_val.astype(np.float32)
+    scaler = None  # 不再需要scaler，因为数据已预处理
 
     train_ds = TickDataset(X_train_s, y_train)
     val_ds = TickDataset(X_val_s, y_val)
@@ -207,6 +327,7 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val,
 # -------------------------
 def run_pipeline(train_df: pd.DataFrame,
                  val_df: pd.DataFrame,
+                 test_df: pd.DataFrame,
                  factor_list: List[str],
                  N_list: List[int],
                  alpha_map: Dict[int, float], # TODO: alpha_map 目前没用上
@@ -214,9 +335,6 @@ def run_pipeline(train_df: pd.DataFrame,
                  out_dir: str = "./results",
                  device: str = "cuda"):
     os.makedirs(out_dir, exist_ok=True)
-    # TODO：暂时用 val 作为 test 看看效果
-    test_df = val_df
-
     results = {}
 
     for N in N_list:
@@ -224,44 +342,51 @@ def run_pipeline(train_df: pd.DataFrame,
         print(f"Start training for N={N}")
         label_col = f"{label_prefix}{N}"
 
-        # 过滤掉 label NaN 的行
-        tr = train_df.dropna(subset=[label_col])
-        va = val_df.dropna(subset=[label_col])
-        te = test_df.dropna(subset=[label_col])
-        print(f"effective samples -> train: {len(tr)} val: {len(va)} test: {len(te)}")
-
-        if len(tr) < 1000 or len(va) < 200:
-            print(f"样本太少，跳过 N={N}")
-            continue
+        print(f"effective samples -> train: {len(train_df)} val: {len(val_df)} test: {len(test_df)}")
 
         # 提取 X,y
-        X_train = tr[factor_list].values.astype(np.float32)
-        y_train = tr[label_col].values.astype(np.int64)
-        X_val = va[factor_list].values.astype(np.float32)
-        y_val = va[label_col].values.astype(np.int64)
-        X_test = te[factor_list].values.astype(np.float32)
-        y_test = te[label_col].values.astype(np.int64)
-        feature_names = factor_list
+        X_train = train_df[factor_list].values.astype(np.float32)
+        y_train = train_df[label_col].values.astype(np.int64)
+        X_val = val_df[factor_list].values.astype(np.float32)
+        y_val = val_df[label_col].values.astype(np.int64)
+        X_test = test_df[factor_list].values.astype(np.float32)
+        y_test = test_df[label_col].values.astype(np.int64)
 
-        # # ---------------- LightGBM ----------------
-        # print("Training LightGBM (GPU)...")
-        # # LightGBM 对 label 要是 0..K-1
-        # bst = train_lightgbm_gpu(X_train, y_train, X_val, y_val, feature_names,
-        #                          save_path=os.path.join(out_dir, f"lgb_N{N}.txt"))
-        # # predict test
-        # y_pred_proba = bst.predict(X_test, num_iteration=bst.best_iteration)
-        # y_pred = np.argmax(y_pred_proba, axis=1)
-        # metrics_lgb = classification_metrics(y_test, y_pred)
-        # print(f"LightGBM N={N} test f0.5_macro: {metrics_lgb['f0.5_macro']:.4f} precision_macro: {metrics_lgb['precision_macro']:.4f} recall_macro: {metrics_lgb['recall_macro']:.4f}")
+        # ---------------- LightGBM ----------------
+        print("Training LightGBM (GPU)...")
+        # LightGBM 对 label 要是 0..K-1
+        bst = train_lightgbm_gpu(X_train, y_train, X_val, y_val, factor_list,
+                                 save_path=os.path.join(out_dir, f"lgb_N{N}.txt"))
+        # predict test
+        y_pred_proba = bst.predict(X_test, num_iteration=bst.best_iteration)
+        y_pred = np.argmax(y_pred_proba, axis=1)
+        metrics_lgb = classification_metrics(y_test, y_pred)
 
-        # # ---------------- SGDClassifier ----------------
-        # print("Training SGDClassifier (incremental logistic)...")
-        # sgd, sgd_scaler = train_sgd_incremental(X_train, y_train, X_val, y_val,
-        #                                         classes=[0,1,2], max_epochs=3, batch_size=200000)
-        # X_test_scaled = sgd_scaler.transform(X_test)
-        # y_pred_sgd = sgd.predict(X_test_scaled)
-        # metrics_sgd = classification_metrics(y_test, y_pred_sgd)
-        # print(f"SGD N={N} test f0.5_macro: {metrics_sgd['f0.5_macro']:.4f} precision_macro: {metrics_sgd['precision_macro']:.4f} recall_macro: {metrics_sgd['recall_macro']:.4f}")
+        # 计算PnL指标
+        pnl_metrics_lgb = calculate_pnl_metrics(y_pred, test_df['n_close_origin'])
+
+        # 合并指标
+        metrics_lgb.update({f"pnl_{k}": v for k, v in pnl_metrics_lgb.items()})
+
+        print(f"LightGBM N={N} test f0.5_macro: {metrics_lgb['f0.5_macro']:.4f} precision_macro: {metrics_lgb['precision_macro']:.4f} recall_macro: {metrics_lgb['recall_macro']:.4f}")
+        print(f"LightGBM N={N} PnL: {pnl_metrics_lgb['total_pnl']:,.0f} Return: {pnl_metrics_lgb['total_return']:.2%} Sharpe: {pnl_metrics_lgb['sharpe_ratio']:.2f} WinRate: {pnl_metrics_lgb['win_rate']:.2%}")
+
+        # ---------------- SGDClassifier ----------------
+        print("Training SGDClassifier (incremental logistic)...")
+        sgd, sgd_scaler = train_sgd_incremental(X_train, y_train, X_val, y_val,
+                                                classes=[0,1,2], max_epochs=3, batch_size=200000)
+        # 数据已经预处理，直接使用
+        y_pred_sgd = sgd.predict(X_test)
+        metrics_sgd = classification_metrics(y_test, y_pred_sgd)
+
+        # 计算PnL指标
+        pnl_metrics_sgd = calculate_pnl_metrics(y_pred_sgd, test_df['n_close_origin'])
+
+        # 合并指标
+        metrics_sgd.update({f"pnl_{k}": v for k, v in pnl_metrics_sgd.items()})
+
+        print(f"SGD N={N} test f0.5_macro: {metrics_sgd['f0.5_macro']:.4f} precision_macro: {metrics_sgd['precision_macro']:.4f} recall_macro: {metrics_sgd['recall_macro']:.4f}")
+        print(f"SGD N={N} PnL: {pnl_metrics_sgd['total_pnl']:,.0f} Return: {pnl_metrics_sgd['total_return']:.2%} Sharpe: {pnl_metrics_sgd['sharpe_ratio']:.2f} WinRate: {pnl_metrics_sgd['win_rate']:.2%}")
 
         # ---------------- PyTorch MLP ----------------
         print("Training PyTorch MLP...")
@@ -291,12 +416,20 @@ def run_pipeline(train_df: pd.DataFrame,
                 preds.append(torch.argmax(logits, dim=1).cpu().numpy())
         preds = np.concatenate(preds)
         metrics_mlp = classification_metrics(y_test, preds)
-        print(f"MLP N={N} test f0.5_macro: {metrics_mlp['f0.5_macro']:.4f} precision_macro: {metrics_mlp['precision_macro']:.4f} recall_macro: {metrics_mlp['recall_macro']:.4f}")
 
-        # 存储结果
+        # 计算PnL指标
+        pnl_metrics_mlp = calculate_pnl_metrics(preds, test_df['n_close_origin'])
+
+        # 合并指标
+        metrics_mlp.update({f"pnl_{k}": v for k, v in pnl_metrics_mlp.items()})
+
+        print(f"MLP N={N} test f0.5_macro: {metrics_mlp['f0.5_macro']:.4f} precision_macro: {metrics_mlp['precision_macro']:.4f} recall_macro: {metrics_mlp['recall_macro']:.4f}")
+        print(f"MLP N={N} PnL: {pnl_metrics_mlp['total_pnl']:,.0f} Return: {pnl_metrics_mlp['total_return']:.2%} Sharpe: {pnl_metrics_mlp['sharpe_ratio']:.2f} WinRate: {pnl_metrics_mlp['win_rate']:.2%}")
+
+        # 存储结果（包含PNL）
         results[N] = {
-            # "lgb": (metrics_lgb, bst.best_iteration),
-            # "sgd": (metrics_sgd, None),
+            "lgb": (metrics_lgb, bst.best_iteration),
+            "sgd": (metrics_sgd, None),
             "mlp": (metrics_mlp, model_path)
         }
 

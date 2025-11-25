@@ -94,15 +94,16 @@ def split_data(file_dir, train_ratio, val_ratio, seed, N_list):
     val_files = []
     test_files = []
     csv_files = glob.glob(os.path.join(raw_data_dir, "*.csv"))
+    assert bool(csv_files), f"No csv files found in {raw_data_dir}!"
 
     for file_path in csv_files:
         if random.random() < train_ratio:
             train_files.append(file_path)
-        elif random.random() > 1 - train_ratio - val_ratio:
-            test_files.append(file_path)
-        else:
+        elif random.random() < train_ratio + val_ratio:
             val_files.append(file_path)
-    
+        else:
+            test_files.append(file_path)
+
     for N in N_list:
         print(f"start split_data N={N}")
         train_data = read_csv_parallel(train_files, N)
@@ -116,7 +117,7 @@ def split_data(file_dir, train_ratio, val_ratio, seed, N_list):
         train_data.to_csv(train_save_path, index=False)
         val_data.to_csv(val_save_path, index=False)
         test_data.to_csv(test_save_path, index=False)
-        
+
         print(f"Saved train_data_{N} to {train_save_path}, shape: {train_data.shape}")
         print(f"Saved val_data_{N} to {val_save_path}, shape: {val_data.shape}")
         print(f"Saved test_data_{N} to {test_save_path}, shape: {test_data.shape}")
