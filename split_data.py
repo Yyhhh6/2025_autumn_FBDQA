@@ -99,10 +99,10 @@ def split_data(file_dir, train_ratio, val_ratio, seed, N_list):
     for file_path in csv_files:
         if random.random() < train_ratio:
             train_files.append(file_path)
-        elif random.random() > 1 - train_ratio - val_ratio:
-            test_files.append(file_path)
-        else:
+        elif random.random() < train_ratio + val_ratio:
             val_files.append(file_path)
+        else:
+            test_files.append(file_path)
 
     for N in N_list:
         print(f"start split_data N={N}")

@@ -32,7 +32,7 @@ def classification_metrics(y_true, y_pred):
     return metrics
 
 def calculate_pnl_metrics(y_true, y_pred, mid_prices=None, price_changes=None,
-                          initial_capital=1000000, transaction_cost=0.0001):
+                          initial_capital=10000, transaction_cost=0.0001):
     """
     计算量化交易的PnL相关指标
 
@@ -52,12 +52,7 @@ def calculate_pnl_metrics(y_true, y_pred, mid_prices=None, price_changes=None,
         price_changes = np.diff(mid_prices) / mid_prices[:-1]
         # 在末尾填充0，因为价格变化数组长度比原始数组少1
         price_changes = np.append(price_changes, 0)
-
-    if price_changes is None:
-        # 如果没有价格信息，使用假设的平均收益
-        # 上涨:+0.1%, 平盘:0%, 下跌:-0.1%
-        price_changes = np.where(y_true == 2, 0.001,
-                                np.where(y_true == 0, -0.001, 0))
+        # TODO: 如果不除以mid_prices[:-1]，而是直接用价格相对于开盘的差值，后面是否直接加和就行？
 
     # 构建交易信号
     # 只在预测为涨(2)时做多，预测为跌(0)时做空，预测为平(1)时不交易
@@ -81,7 +76,7 @@ def calculate_pnl_metrics(y_true, y_pred, mid_prices=None, price_changes=None,
     cumulative_returns = np.cumprod(1 + net_returns)
 
     # PnL计算
-    pnl = initial_capital * (cumulative_returns - 1)
+    pnl_bps = initial_capital * (cumulative_returns - 1)
 
     # 基础统计
     total_trades = np.sum(position_changes)
@@ -120,7 +115,7 @@ def calculate_pnl_metrics(y_true, y_pred, mid_prices=None, price_changes=None,
     long_only_total_return = long_only_cumulative_returns[-1] - 1
 
     return {
-        "total_pnl": pnl[-1],
+        "total_pnl": pnl_bps[-1],
         "total_return": total_return,
         "annual_return": annual_return,
         "sharpe_ratio": sharpe_ratio,
@@ -365,12 +360,7 @@ def run_pipeline(train_df: pd.DataFrame,
         metrics_lgb = classification_metrics(y_test, y_pred)
 
         # 计算PnL指标
-        # 如果有中间价数据，使用实际价格计算收益
-        if 'n_midprice' in test_df.columns:
-            mid_prices = test_df['n_midprice'].values
-            pnl_metrics_lgb = calculate_pnl_metrics(y_test, y_pred, mid_prices=mid_prices)
-        else:
-            pnl_metrics_lgb = calculate_pnl_metrics(y_test, y_pred)
+        pnl_metrics_lgb = calculate_pnl_metrics(y_test, y_pred, y_test['n_close_origin'])
 
         # 合并指标
         metrics_lgb.update({f"pnl_{k}": v for k, v in pnl_metrics_lgb.items()})
@@ -387,11 +377,7 @@ def run_pipeline(train_df: pd.DataFrame,
         metrics_sgd = classification_metrics(y_test, y_pred_sgd)
 
         # 计算PnL指标
-        if 'n_midprice' in test_df.columns:
-            mid_prices = test_df['n_midprice'].values
-            pnl_metrics_sgd = calculate_pnl_metrics(y_test, y_pred_sgd, mid_prices=mid_prices)
-        else:
-            pnl_metrics_sgd = calculate_pnl_metrics(y_test, y_pred_sgd)
+        pnl_metrics_sgd = calculate_pnl_metrics(y_test, y_pred_sgd, y_test['n_close_origin'])
 
         # 合并指标
         metrics_sgd.update({f"pnl_{k}": v for k, v in pnl_metrics_sgd.items()})
@@ -429,11 +415,7 @@ def run_pipeline(train_df: pd.DataFrame,
         metrics_mlp = classification_metrics(y_test, preds)
 
         # 计算PnL指标
-        if 'n_midprice' in test_df.columns:
-            mid_prices = test_df['n_midprice'].values
-            pnl_metrics_mlp = calculate_pnl_metrics(y_test, preds, mid_prices=mid_prices)
-        else:
-            pnl_metrics_mlp = calculate_pnl_metrics(y_test, preds)
+        pnl_metrics_mlp = calculate_pnl_metrics(y_test, preds, y_test['n_close_origin'])
 
         # 合并指标
         metrics_mlp.update({f"pnl_{k}": v for k, v in pnl_metrics_mlp.items()})
@@ -447,13 +429,6 @@ def run_pipeline(train_df: pd.DataFrame,
             "sgd": (metrics_sgd, None),
             "mlp": (metrics_mlp, model_path)
         }
-
-        # 打印PNL比较
-        print(f"\nPNL Comparison for N={N}:")
-        print(f"LightGBM: {pnl_lgb['bps_pnl']:>8.2f} bps, Sharpe: {pnl_lgb['sharpe_ratio']:>6.2f}")
-        print(f"SGD:      {pnl_sgd['bps_pnl']:>8.2f} bps, Sharpe: {pnl_sgd['sharpe_ratio']:>6.2f}")
-        print(f"MLP:      {pnl_mlp['bps_pnl']:>8.2f} bps, Sharpe: {pnl_mlp['sharpe_ratio']:>6.2f}")
-
 
     return results
 

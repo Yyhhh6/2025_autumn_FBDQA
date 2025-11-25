@@ -1,6 +1,20 @@
 import pandas as pd
 from datetime import datetime, timedelta
+import numpy as np
 
+def check_finite_pandas(df): 
+    return not np.isinf(df.select_dtypes(include=[np.number])).any().any()
+def check_nan_pandas(df):
+    return not df.isna().any().any()
+
+def factors_null_process(data: pd.DataFrame, feature_names: list, class_name: str) -> pd.DataFrame:
+    data_nan_features = data[feature_names].isnull().sum()
+    # TODO: 换为中位数？
+    if data_nan_features.any():
+        print(f"{class_name}NaN特征: {data_nan_features[data_nan_features > 0]}")
+        data = data.fillna(data[feature_names].mean())
+    return data
+       
 def remove_outliers(data: pd.DataFrame, feature_names: list, lower_quantile: float = 0.01, upper_quantile: float = 0.99) -> pd.DataFrame:
     ''' 去除异常值，使用分位数法 '''
     data_ = data.copy()
