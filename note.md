@@ -1,3 +1,4 @@
+# 说明
 - 一共有1521个文件，total data shape: (3040479, 31)
 - 自己直接按照4：1随机划分文件作为验证集和测试集，随机种子为42，进行数据分析：
     - 逐个concat:251s, 全部读取后一道concat:15s, ThreadPoolExecutor并行读取：6s
@@ -21,10 +22,19 @@
     1. 没有做任何数据处理，采用树模型。
     2. 
 
+- 运行指令：
+    ```
+    python -u run.py > log.txt
+    ```
+
 # TOOD
 1. 检查涨跌停，处理盘口价格
-2. cal_pnl
-3. 决策树的选择
+2. factors_null_process：部分特征缺失值过多，如何处理
+3. 为什么train, val, test样本的实际比例不对？？
+4. cal_pnl计算流程是否正确？
+5. 中间价和盘口价的原始数据都已经标准化了，之后还需要标准化吗？？（可能标准化的范围不一样:sym?date?）
+6. 对犯的不同错误设置不同的损失：把recall降一降，提高precision和pnl
+7. 决策树的选择
     
     📌 总结对比
     | 特性     | XGBoost    | LightGBM    | CatBoost     |
@@ -44,3 +54,4 @@
     - 需要稳健的经典方案，调参空间大 → XGBoost
 
 
+先替换 inf → 再填充 nan → 再 mad 去极值（基于 train） → 再 zscore 归一（基于 train）

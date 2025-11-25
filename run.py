@@ -47,8 +47,7 @@ feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice', 'n_bid1'
                  'n_bsize1', 'n_bid2', 'n_bsize2', 'n_bid3', 'n_bsize3', 'n_bid4', 
                  'n_bsize4', 'n_bid5', 'n_bsize5', 'n_ask1', 'n_asize1', 'n_ask2', 
                  'n_asize2', 'n_ask3', 'n_asize3', 'n_ask4', 'n_asize4', 'n_ask5', 
-                 'n_asize5', 'label_5', 'label_10', 'label_20', 'label_40', 'label_60', 
-                 'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 'ask1', 'ask2', 'ask3', 'ask4', 
+                 'n_asize5', 'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 'ask1', 'ask2', 'ask3', 'ask4', 
                  'ask5', 'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 'ask1_ma40', 'ask1_ma60', 
                  'ask1_ma80', 'ask1_ma100', 'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 
                  'bid1_ma40', 'bid1_ma60', 'bid1_ma80', 'bid1_ma100', 'spread1', 'spread2', 
@@ -73,7 +72,7 @@ feature_names = ['time_label', 'n_close', 'amount_delta', 'n_midprice', 'n_bid1'
                  'spread_mean_100', 'spread_std_100']
 
 
-
+# raw_data → replace inf → replace nan → 去极值 (MAD 或百分位, train-based) → 标准化 (train-based)
 for N in N_list:
     train_data, val_data, test_data = load_data(file_dir=file_dir, N=N) # TODO：此时是针对不同N训练不同的模型，需要训练一个统一的模型吗？
 
@@ -81,9 +80,14 @@ for N in N_list:
     train_data['time_label'] = assign_tick_time_labels(train_data['time'])
     val_data['time_label'] = assign_tick_time_labels(val_data['time'])
     test_data['time_label'] = assign_tick_time_labels(test_data['time'])
-    test_data['n_close_origin'] = test_data['n_close']  # 保存原始收盘价用于后续计算PnL
+    test_data['n_close_origin'] = test_data['n_close'].copy()  # 保存原始收盘价用于后续计算PnL
 
     print("train_data的列名：", train_data.columns.tolist())
+
+    # 替换inf
+    train_data.replace([np.inf, -np.inf], np.nan, inplace=True)
+    val_data.replace([np.inf, -np.inf], np.nan, inplace=True)
+    test_data.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     # 去NaN（包括时间标签检查）
     ## 处理时间标签的NaN值，使用0填充或删除
@@ -102,17 +106,10 @@ for N in N_list:
     assert check_nan_pandas(test_data['time_label']), "test_data的time_label中存在NaN值，请检查！"
 
     ## 检查特征列中的NaN
-    train_data = factors_null_process(train_data, feature_names=feature_names, class_name="训练集")
-    val_data = factors_null_process(val_data, feature_names=feature_names, class_name="验证集")
-    test_data = factors_null_process(test_data, feature_names=feature_names, class_name="测试集")
-    
-    # 去inf值
-    train_data, val_data, test_data = factors_inf_process(feature_names=feature_names, train=train_data, val=val_data, test=test_data)
+    train_data, val_data, test_data = factors_null_process(feature_names=feature_names, train=train_data, val=val_data, test=test_data)
 
     # 去极值（基于训练集统计量）
-    train_data = extreme_process_MAD(train_data, feature_names=feature_names, num=3)
-    val_data = extreme_process_MAD(val_data, feature_names=feature_names, num=3)
-    test_data = extreme_process_MAD(test_data, feature_names=feature_names, num=3)
+    train_data, val_data, test_data = extreme_process_MAD(feature_names=feature_names, train=train_data, val=val_data, test=test_data, num=3)
 
     # 归一化
     train_data[feature_names] = data_scale_Z_Score(train_data, feature_names=feature_names)

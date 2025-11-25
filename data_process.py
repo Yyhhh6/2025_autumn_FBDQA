@@ -7,7 +7,7 @@ def check_finite_pandas(df):
 def check_nan_pandas(df):
     return not df.isna().any().any()
 
-def factors_inf_process(feature_names: list, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
+def factors_null_process(feature_names: list, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
     medians = train[feature_names].median()
 
     # 使用训练集的中位数填充 train/val/test
@@ -17,13 +17,6 @@ def factors_inf_process(feature_names: list, train: pd.DataFrame, val: pd.DataFr
     
     return train, val, test
 
-def factors_null_process(data: pd.DataFrame, feature_names: list, class_name: str) -> pd.DataFrame:
-    data_nan_features = data[feature_names].isnull().sum()
-    # TODO: 换为中位数？
-    if data_nan_features.any():
-        # print(f"{class_name}NaN特征: {data_nan_features[data_nan_features > 0]}")
-        data = data.fillna(data[feature_names].mean())
-    return data
        
 def remove_outliers(data: pd.DataFrame, feature_names: list, lower_quantile: float = 0.01, upper_quantile: float = 0.99) -> pd.DataFrame:
     ''' 去除异常值，使用分位数法 '''
@@ -34,17 +27,19 @@ def remove_outliers(data: pd.DataFrame, feature_names: list, lower_quantile: flo
         data_ = data_[(data_[feature] >= lower_bound) & (data_[feature] <= upper_bound)]
     return data_
 
-def extreme_process_MAD(data: pd.DataFrame, feature_names, num: int = 3) -> pd.DataFrame:
-    ''' data为输入的数据集，如果数值超过num个判断标准则使其等于num个标准'''
-    data_ = data.copy()
-    median = data_[feature_names].median(axis=0)
-    # 按列索引匹配，并在行中广播
-    MAD = abs(data_[feature_names].sub(median, axis=1)
-              ).median(axis=0)
-    # 利用clip()函数，将因子取值限定在上下限范围内，即用上下限来代替异常值
-    data_.loc[:, feature_names] = data_.loc[:, feature_names].clip(
-        lower=median-num * 1.4826 * MAD, upper=median + num * 1.4826 * MAD, axis=1)
-    return data_
+def calc_MAD_params(train, feature_names, num=3):
+    median = train[feature_names].median(axis=0)
+    mad = (train[feature_names].sub(median).abs()).median(axis=0)
+    lower = median - num * 1.4826 * mad
+    upper = median + num * 1.4826 * mad
+    return lower, upper
+
+def extreme_process_MAD(feature_names, train, val, test, num=3) -> pd.DataFrame:
+    lower, upper = calc_MAD_params(train, feature_names, num)
+    train[feature_names] = train[feature_names].clip(lower=lower, upper=upper, axis=1)
+    val[feature_names] = val[feature_names].clip(lower=lower, upper=upper, axis=1)
+    test[feature_names] = test[feature_names].clip(lower=lower, upper=upper, axis=1)
+    return train, val, test
 
 def data_scale_Z_Score(data, feature_names=None):
     if feature_names is not None:
