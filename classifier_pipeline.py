@@ -250,6 +250,28 @@ class MLPClassifier(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+class CostSensitiveLoss(nn.Module):
+    def __init__(self, cost_matrix):
+        super().__init__()
+        self.cost_matrix = cost_matrix  # Tensor [3,3]
+
+    def forward(self, logits, y_true):
+        """
+        logits: [B, 3]
+        y_true: [B]
+        """
+        # softmax → 概率分布
+        probs = torch.softmax(logits, dim=1)  # [B, 3]
+
+        # 根据 y_true 取出每一行的 cost
+        # cost_per_sample[b] = Σ_j   P(j|x_b) * C[y_true_b][j]
+        cost_per_sample = torch.sum(
+            probs * self.cost_matrix[y_true], dim=1
+        )
+
+        return cost_per_sample.mean()
+
+
 def train_pytorch_mlp(X_train, y_train, X_val, y_val,
                       input_dim, device='cuda',
                       hidden_dims=[512,256], lr=1e-3,
@@ -269,7 +291,14 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val,
     model = MLPClassifier(input_dim=input_dim, hidden_dims=hidden_dims, dropout=0.2, num_classes=3)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    criterion = nn.CrossEntropyLoss()
+    # criterion = nn.CrossEntropyLoss()
+    cost_matrix = torch.tensor([
+        [-3.0, 1.0, 5.0],   # true = 0
+        [1.0, -0.0, 1.0],    # true = 1
+        [5.0, 1.0, -3.0],   # true = 2
+    ], dtype=torch.float32, device=device)
+
+    criterion = CostSensitiveLoss(cost_matrix)
 
     best_val = -np.inf
     epochs_no_improve = 0
@@ -278,11 +307,13 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val,
         model.train()
         running_loss = 0.0
         for xb, yb in train_loader:
-            # print("xb: ", xb)
-            # print("yb: ", yb)
+            print("xb: ", xb.shape, xb)
+            print("yb: ", yb.shape, yb)
             xb = xb.to(device)
             yb = yb.to(device)
-            logits = model(xb)
+            logits = model(xb) # 没有经过softmax
+            print("logits: ", logits.shape, logits)
+            print("pred: ", torch.argmax(logits, dim=1))
             loss = criterion(logits, yb)
             optimizer.zero_grad()
             loss.backward()
@@ -300,16 +331,25 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val,
                 yb = yb.to(device)
                 logits = model(xb)
                 pred = torch.argmax(logits, dim=1).cpu().numpy()
+                print("val batch pred: ", pred)
+                print(pred[pred==0].shape, pred[pred==1].shape, pred[pred==2].shape)
+                print("val batch true: ", yb.cpu().numpy())
+                print(yb.cpu().numpy()[yb.cpu().numpy()==0].shape, yb.cpu().numpy()[yb.cpu().numpy()==1].shape, yb.cpu().numpy()[yb.cpu().numpy()==2].shape)
+                print()
                 preds.append(pred)
                 trues.append(yb.cpu().numpy())
         preds = np.concatenate(preds)
         trues = np.concatenate(trues)
-        val_f0_5 = fbeta_score(trues, preds, average='macro', zero_division=0, beta=0.5)
-        print(f"[PyTorch] Epoch {epoch} train_loss={avg_train_loss:.4f} val_f0.5_macro={val_f0_5:.4f} precision_macro={precision_score(trues, preds, average='macro', zero_division=0):.4f} recall_macro={recall_score(trues, preds, average='macro', zero_division=0):.4f}")
+        # 只统计标签 0 和 2 的 precision / recall
+        precision_0_2 = precision_score(trues, preds, labels=[0, 2], average='macro', zero_division=0)
+        recall_0_2 = recall_score(trues, preds, labels=[0, 2], average='macro', zero_division=0)
 
-        # early stopping by val_f0_5
-        if val_f0_5 > best_val:
-            best_val = val_f0_5
+        print(f"[PyTorch] Epoch {epoch} train_loss={avg_train_loss:.4f} "
+              f"precision_0_2={precision_0_2:.4f} recall_0_2={recall_0_2:.4f}")
+
+        # early stopping by precision_0_2
+        if precision_0_2 > best_val:
+            best_val = precision_0_2
             epochs_no_improve = 0
             torch.save(model.state_dict(), model_path)
         else:
@@ -317,6 +357,20 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val,
             if epochs_no_improve >= patience:
                 print("Early stopping.")
                 break
+        # # TODO：改为precision或者pnl？
+        # val_f0_5 = fbeta_score(trues, preds, average='macro', zero_division=0, beta=0.5)
+        # print(f"[PyTorch] Epoch {epoch} train_loss={avg_train_loss:.4f} val_f0.5_macro={val_f0_5:.4f} precision_macro={precision_score(trues, preds, average='macro', zero_division=0):.4f} recall_macro={recall_score(trues, preds, average='macro', zero_division=0):.4f}")
+
+        # # early stopping by val_f0_5
+        # if val_f0_5 > best_val:
+        #     best_val = val_f0_5
+        #     epochs_no_improve = 0
+        #     torch.save(model.state_dict(), model_path)
+        # else:
+        #     epochs_no_improve += 1
+        #     if epochs_no_improve >= patience:
+        #         print("Early stopping.")
+        #         break
 
     # load best
     model.load_state_dict(torch.load(model_path, map_location=device))
@@ -353,40 +407,40 @@ def run_pipeline(train_df: pd.DataFrame,
         y_test = test_df[label_col].values.astype(np.int64)
 
         # ---------------- LightGBM ----------------
-        print("Training LightGBM (GPU)...")
-        # LightGBM 对 label 要是 0..K-1
-        bst = train_lightgbm_gpu(X_train, y_train, X_val, y_val, factor_list,
-                                 save_path=os.path.join(out_dir, f"lgb_N{N}.txt"))
-        # predict test
-        y_pred_proba = bst.predict(X_test, num_iteration=bst.best_iteration)
-        y_pred = np.argmax(y_pred_proba, axis=1)
-        metrics_lgb = classification_metrics(y_test, y_pred)
+        # print("Training LightGBM (GPU)...")
+        # # LightGBM 对 label 要是 0..K-1
+        # bst = train_lightgbm_gpu(X_train, y_train, X_val, y_val, factor_list,
+        #                          save_path=os.path.join(out_dir, f"lgb_N{N}.txt"))
+        # # predict test
+        # y_pred_proba = bst.predict(X_test, num_iteration=bst.best_iteration)
+        # y_pred = np.argmax(y_pred_proba, axis=1)
+        # metrics_lgb = classification_metrics(y_test, y_pred)
 
-        # 计算PnL指标
-        pnl_metrics_lgb = calculate_pnl_metrics(y_pred, test_df['n_close_origin'])
+        # # 计算PnL指标
+        # pnl_metrics_lgb = calculate_pnl_metrics(y_pred, test_df['n_close_origin'])
 
-        # 合并指标
-        metrics_lgb.update({f"pnl_{k}": v for k, v in pnl_metrics_lgb.items()})
+        # # 合并指标
+        # metrics_lgb.update({f"pnl_{k}": v for k, v in pnl_metrics_lgb.items()})
 
-        print(f"LightGBM N={N} test f0.5_macro: {metrics_lgb['f0.5_macro']:.4f} precision_macro: {metrics_lgb['precision_macro']:.4f} recall_macro: {metrics_lgb['recall_macro']:.4f}")
-        print(f"LightGBM N={N} PnL: {pnl_metrics_lgb['total_pnl']:,.0f} Return: {pnl_metrics_lgb['total_return']:.2%} Sharpe: {pnl_metrics_lgb['sharpe_ratio']:.2f} WinRate: {pnl_metrics_lgb['win_rate']:.2%}")
+        # print(f"LightGBM N={N} test f0.5_macro: {metrics_lgb['f0.5_macro']:.4f} precision_macro: {metrics_lgb['precision_macro']:.4f} recall_macro: {metrics_lgb['recall_macro']:.4f}")
+        # print(f"LightGBM N={N} PnL: {pnl_metrics_lgb['total_pnl']:,.0f} Return: {pnl_metrics_lgb['total_return']:.2%} Sharpe: {pnl_metrics_lgb['sharpe_ratio']:.2f} WinRate: {pnl_metrics_lgb['win_rate']:.2%}")
 
-        # ---------------- SGDClassifier ----------------
-        print("Training SGDClassifier (incremental logistic)...")
-        sgd, sgd_scaler = train_sgd_incremental(X_train, y_train, X_val, y_val,
-                                                classes=[0,1,2], max_epochs=3, batch_size=200000)
-        # 数据已经预处理，直接使用
-        y_pred_sgd = sgd.predict(X_test)
-        metrics_sgd = classification_metrics(y_test, y_pred_sgd)
+        # # ---------------- SGDClassifier ----------------
+        # print("Training SGDClassifier (incremental logistic)...")
+        # sgd, sgd_scaler = train_sgd_incremental(X_train, y_train, X_val, y_val,
+        #                                         classes=[0,1,2], max_epochs=3, batch_size=200000)
+        # # 数据已经预处理，直接使用
+        # y_pred_sgd = sgd.predict(X_test)
+        # metrics_sgd = classification_metrics(y_test, y_pred_sgd)
 
-        # 计算PnL指标
-        pnl_metrics_sgd = calculate_pnl_metrics(y_pred_sgd, test_df['n_close_origin'])
+        # # 计算PnL指标
+        # pnl_metrics_sgd = calculate_pnl_metrics(y_pred_sgd, test_df['n_close_origin'])
 
-        # 合并指标
-        metrics_sgd.update({f"pnl_{k}": v for k, v in pnl_metrics_sgd.items()})
+        # # 合并指标
+        # metrics_sgd.update({f"pnl_{k}": v for k, v in pnl_metrics_sgd.items()})
 
-        print(f"SGD N={N} test f0.5_macro: {metrics_sgd['f0.5_macro']:.4f} precision_macro: {metrics_sgd['precision_macro']:.4f} recall_macro: {metrics_sgd['recall_macro']:.4f}")
-        print(f"SGD N={N} PnL: {pnl_metrics_sgd['total_pnl']:,.0f} Return: {pnl_metrics_sgd['total_return']:.2%} Sharpe: {pnl_metrics_sgd['sharpe_ratio']:.2f} WinRate: {pnl_metrics_sgd['win_rate']:.2%}")
+        # print(f"SGD N={N} test f0.5_macro: {metrics_sgd['f0.5_macro']:.4f} precision_macro: {metrics_sgd['precision_macro']:.4f} recall_macro: {metrics_sgd['recall_macro']:.4f}")
+        # print(f"SGD N={N} PnL: {pnl_metrics_sgd['total_pnl']:,.0f} Return: {pnl_metrics_sgd['total_return']:.2%} Sharpe: {pnl_metrics_sgd['sharpe_ratio']:.2f} WinRate: {pnl_metrics_sgd['win_rate']:.2%}")
 
         # ---------------- PyTorch MLP ----------------
         print("Training PyTorch MLP...")
@@ -428,8 +482,8 @@ def run_pipeline(train_df: pd.DataFrame,
 
         # 存储结果（包含PNL）
         results[N] = {
-            "lgb": (metrics_lgb, bst.best_iteration),
-            "sgd": (metrics_sgd, None),
+            # "lgb": (metrics_lgb, bst.best_iteration),
+            # "sgd": (metrics_sgd, None),
             "mlp": (metrics_mlp, model_path)
         }
 

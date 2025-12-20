@@ -1,0 +1,10 @@
+{
+    "python_version": "3.10",
+    "batch": 32,
+    "feature": ["time", "sym", "n_close", "amount_delta", "n_midprice",
+    "n_bid1", "n_bsize1", "n_bid2", "n_bsize2", "n_bid3", "n_bsize3",
+    "n_bid4", "n_bsize4", "n_bid5", "n_bsize5", "n_ask1", "n_asize1",
+    "n_ask2", "n_asize2", "n_ask3", "n_asize3", "n_ask4", "n_asize4",
+    "n_ask5", "n_asize5"],
+    "label": ["label_5", "label_10", "label_20", "label_40", "label_60"]
+}
