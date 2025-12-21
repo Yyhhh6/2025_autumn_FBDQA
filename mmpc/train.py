@@ -1,14 +1,12 @@
-from model import XGBModel
-from Predictor import preprocess
+from .model import XGBModel
+from .Predictor import preprocess
+from .data_process import *
 import os
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import random
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, log_loss, mean_squared_log_error
-from concurrent.futures import ThreadPoolExecutor
-from data_process import *
 from tqdm import tqdm
 
 
@@ -19,7 +17,7 @@ SEED = 42
 # N_list = [5, 10, 20, 40, 60]
 N_list = [5]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
-file_dir="../data/data_raw"
+file_dir="./data/data_raw"
 
 def split_csv_files(
     data_dir,
@@ -38,7 +36,7 @@ def split_csv_files(
 
     csv_files.sort()  # 保证稳定
     random.seed(seed)
-    random.shuffle(csv_files)
+    # random.shuffle(csv_files)
 
     n = len(csv_files)
     n_train = int(n * train_ratio)
@@ -61,15 +59,12 @@ def extract_feature(files_dir, N):
             df = df.reset_index(drop=True)
             df, labels = preprocess(df, N)
             df = df.squeeze(axis=0)
-            # print(f"df shape before preprocess: {df.shape}")
-            # print(f"labels shape before preprocess: {labels.shape}")
             labels = labels[99:]
             # df_list = []
             # for idx in range(len(df) - 99):
             #     df_list.append(df[idx:idx+100])
             # df_list = np.stack(df_list,axis=0)
             df_list = df[99:]
-            # print(f"len(df_list) for file {file} is {len(df_list)}")
         else:
             print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
@@ -95,41 +90,29 @@ for N in N_list:
     test_data, test_labels = extract_feature(files_dir=test_files, N=N)
     
     # 替换inf
-    print(f"Before replacing inf, train_data has {np.isinf(train_data).sum()} inf values.")
     train_data[~np.isfinite(train_data)] = np.nan
     val_data[~np.isfinite(val_data)]     = np.nan
     test_data[~np.isfinite(test_data)]   = np.nan
-    print(f"train_data shape is {train_data.shape}")
-    print(f"train_labels shape is {train_labels.shape}")
-    print(f"val_data shape is {val_data.shape}")
-    print(f"val_labels shape is {val_labels.shape}")
+
     # 去NaN
     # TODO：tree_method="hist" 时，XGBoost 能处理 NaN，不需要额外处理
-    print(f"Before replacing NaN, train_data has {np.isnan(train_data).sum()} NaN values.")
-    train_data, val_data, test_data = factors_null_process_np(train=train_data, val=val_data, test=test_data)
-    print(f"train_data shape is {train_data.shape}")
-    print(f"train_labels shape is {train_labels.shape}")
-    print(f"val_data shape is {val_data.shape}")
-    print(f"val_labels shape is {val_labels.shape}")
+    train_data, val_data, test_data, medians = factors_null_process_np(train=train_data, val=val_data, test=test_data)
 
     # 去极值（基于训练集统计量）
-    print(f"Before extreme value processing, train_data stats: min={np.nanmin(train_data)}, max={np.nanmax(train_data)}")
-    train_data, val_data, test_data = extreme_process_MAD_np(train=train_data, val=val_data, test=test_data, num=3)
-    print(f"train_data shape is {train_data.shape}")
-    print(f"train_labels shape is {train_labels.shape}")
-    print(f"val_data shape is {val_data.shape}")
-    print(f"val_labels shape is {val_labels.shape}")
+    train_data, val_data, test_data, lower, upper = extreme_process_MAD_np(train=train_data, val=val_data, test=test_data, num=3)
+    
     # 归一化
-    print(f"Before scaling, train_data stats: min={np.nanmin(train_data)}, max={np.nanmax(train_data)}")
-    train_data= data_scale_Z_Score_np(train_data)
-    val_data= data_scale_Z_Score_np(val_data)
-    test_data= data_scale_Z_Score_np(test_data)
-    print(f"train_data shape is {train_data.shape}")
-    print(f"train_labels shape is {train_labels.shape}")
-    print(f"val_data shape is {val_data.shape}")
-    print(f"val_labels shape is {val_labels.shape}")
+    train_data, val_data, test_data, mean, std = data_scale_Z_Score_np(train=train_data, val=val_data, test=test_data)
 
-    print(f"After preprocessing, train_data stats: min={np.nanmin(train_data)}, max={np.nanmax(train_data)}")
+    np.savez(
+        "mmpc/scaler.npz",
+        median=medians,
+        mad_lower=lower,
+        mad_upper=upper,
+        mean=mean,
+        std=std
+    )
+
     model = XGBModel()
     model.train(
         train_data,

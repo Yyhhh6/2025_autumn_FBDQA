@@ -2,19 +2,19 @@ import pandas as pd
 from datetime import datetime, timedelta
 import numpy as np
 
-def factors_null_process_np(train, val, test):
-    """
-    feature_idx: List[int]，需要处理的列索引
-    train/val/test: np.ndarray, shape (N, D)
-    """
-    # 计算训练集特征列的中位数（忽略 NaN）
-    medians = np.nanmedian(train, axis=0)
+def factors_null_process_np(train, val=None, test=None, medians=None):
+    if medians is None:
+        medians = np.nanmedian(train, axis=0)
 
-    for data in (train, val, test):
-        mask = np.isnan(data)
-        data[mask] = medians[np.where(mask)[1]]
-
-    return train, val, test
+    if val is not None and test is not None:
+        for data in (train, val, test):
+            mask = np.isnan(data)
+            data[mask] = medians[np.where(mask)[1]]
+        return train, val, test, medians
+    else:
+        mask = np.isnan(train)
+        train[mask] = medians[np.where(mask)[1]]
+        return train
 
 def calc_MAD_params_np(input, num=3):
     """
@@ -29,36 +29,33 @@ def calc_MAD_params_np(input, num=3):
     return lower, upper
 
 
-def extreme_process_MAD_np(train, val, test, num=3):
-    lower, upper = calc_MAD_params_np(train, num)
+def extreme_process_MAD_np(train, val=None, test=None, lower=None, upper=None, num=3):
+    if lower is None or upper is None:
+        lower, upper = calc_MAD_params_np(train, num)
 
-    for data in (train, val, test):
-        np.clip(data, lower, upper, out=data)
-
-    return train, val, test
-
-
-def data_scale_Z_Score_np(data, feature_idx=None):
-    """
-    data: np.ndarray, shape (N, D)
-    feature_idx: List[int] or None
-    """
-    data_ = data.copy()
-
-    if feature_idx is not None:
-        sub = data_[:, feature_idx]
-
-        mean = np.nanmean(sub, axis=0)
-        std = np.nanstd(sub, axis=0)
-
-        data_[:, feature_idx] = (sub - mean) / (std + 1e-10)
+    if val is not None and test is not None:
+        for data in (train, val, test):
+            np.clip(data, lower, upper, out=data)
+        return train, val, test, lower, upper
     else:
-        mean = np.nanmean(data_, axis=0)
-        std = np.nanstd(data_, axis=0)
+        np.clip(train, lower, upper, out=train)
+        return train
 
-        data_ = (data_ - mean) / (std + 1e-10)
+def calc_mean_std_np(data, mean=None, std=None):
+    mean = np.nanmean(data, axis=0)
+    std = np.nanstd(data, axis=0)
+    return (data - mean) / (std + 1e-10), mean, std
 
-    return data_
+def data_scale_Z_Score_np(train, val=None, test=None, mean=None, std=None):
+    if mean is not None and std is not None:
+        train = (train - mean) / (std + 1e-10)
+        return train
+    else:
+        train, mean, std = calc_mean_std_np(train)
+        val = (val - mean) / (std + 1e-10)
+        test = (test - mean) / (std + 1e-10)
+        return train, val, test, mean, std
+
 
 def check_finite_pandas(df): 
     return not np.isinf(df.select_dtypes(include=[np.number])).any().any()

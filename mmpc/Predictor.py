@@ -1,12 +1,9 @@
 import os
 from typing import List, Union
 import pandas as pd
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-from model import XGBModel
-from data_process import *
+from .model import XGBModel
+from .data_process import assign_tick_time_labels, factors_null_process_np, extreme_process_MAD_np, data_scale_Z_Score_np
 
 class Predictor():
     def __init__(self):
@@ -15,14 +12,19 @@ class Predictor():
         pth_path = os.path.join(os.path.dirname(__file__), 'model.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
+        print(f"model loaded from {pth_path}")
         
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
         # 对输入数据进行预处理
-        x_hat = preprocess(x)
+        print(f"Received {len(x)} dataframes for prediction.")
+        x_hat = self.preprocess(x)
         y = []
-        for _ in range(5):
-            y_pred = self.model.predict(x_hat)   # (N, 3)
-            y.append(np.argmax(y_pred, axis=1).tolist())
+        # for _ in range(1): # TODO
+        y_pred = self.model.predict(x_hat)   # (N, 3)
+        confidence = np.max(y_pred, axis=1)
+        signal = np.argmax(y_pred, axis=1)
+        signal[confidence < 0.6] = 1 # 信心不足时，预测为不变
+        y.append(signal.tolist())
         y = np.array(y).T.tolist()
         # 确保返回格式为 List[List[int]]
         if isinstance(y[0], list):
@@ -33,6 +35,8 @@ class Predictor():
     def load_model(self, model_path: str):
         return XGBModel(model_path)
 
+    def preprocess(self, x: Union[List[pd.DataFrame], pd.DataFrame]):
+        return preprocess(x)
 
 def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
     """
@@ -89,16 +93,16 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['relative_spread3'] = df['spread3'] / df['mid_price3']
 
         # 对量取对数
-        df['bsize1'] = df['n_bsize1'].map(np.log)
-        df['bsize2'] = df['n_bsize2'].map(np.log)
-        df['bsize3'] = df['n_bsize3'].map(np.log)
-        df['bsize4'] = df['n_bsize4'].map(np.log)
-        df['bsize5'] = df['n_bsize5'].map(np.log)
-        df['asize1'] = df['n_asize1'].map(np.log)
-        df['asize2'] = df['n_asize2'].map(np.log)
-        df['asize3'] = df['n_asize3'].map(np.log)
-        df['asize4'] = df['n_asize4'].map(np.log)
-        df['asize5'] = df['n_asize5'].map(np.log)
+        df['bsize1'] = df['n_bsize1'].map(np.log1p)
+        df['bsize2'] = df['n_bsize2'].map(np.log1p)
+        df['bsize3'] = df['n_bsize3'].map(np.log1p)
+        df['bsize4'] = df['n_bsize4'].map(np.log1p)
+        df['bsize5'] = df['n_bsize5'].map(np.log1p)
+        df['asize1'] = df['n_asize1'].map(np.log1p)
+        df['asize2'] = df['n_asize2'].map(np.log1p)
+        df['asize3'] = df['n_asize3'].map(np.log1p)
+        df['asize4'] = df['n_asize4'].map(np.log1p)
+        df['asize5'] = df['n_asize5'].map(np.log1p)
         df['amount'] = df['amount_delta'].map(np.log1p)
 
         # 均线特征
@@ -123,9 +127,17 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         arrays.append(arr)
     
     x_hat = np.stack(arrays, axis=0)
+    # print(f"x_hat shape after stacking is {x_hat.shape}")
     if N: # 训练时需要返回标签
         label = np.ascontiguousarray(label.values.astype(np.int8))
         # print(f"label shape after conversion is {label.shape}")
         # print(f"x_hat shape after stacking is {x_hat.shape}")
         return x_hat, label
-    return x_hat
+
+    scaler = np.load(os.path.join(os.path.dirname(__file__), 'scaler.npz'))
+    x_hat = x_hat[:, -1, :]
+    x_hat[~np.isfinite(x_hat)] = np.nan
+    x_hat = factors_null_process_np(x_hat, medians=scaler['median'])
+    x_hat = extreme_process_MAD_np(x_hat, lower=scaler['mad_lower'], upper=scaler['mad_upper'], num=3)
+    x_hat = data_scale_Z_Score_np(x_hat, mean=scaler['mean'], std=scaler['std'])
+    return x_hat  # 只取最后一行

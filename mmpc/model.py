@@ -2,6 +2,35 @@ import xgboost as xgb
 import numpy as np
 from typing import Optional
 
+def pnl_weighted_softmax_obj(preds, dtrain):
+    """
+    preds: raw margin, shape (N * K,)
+    y: label in {0,1,2}
+    """
+    y = dtrain.get_label().astype(int)
+    K = 3
+    N = y.shape[0]
+
+    preds = preds.reshape(N, K)
+
+    # softmax
+    exp_preds = np.exp(preds - np.max(preds, axis=1, keepdims=True))
+    prob = exp_preds / np.sum(exp_preds, axis=1, keepdims=True)
+
+    grad = prob.copy()
+    grad[np.arange(N), y] -= 1.0
+
+    # ===== 核心：方向权重 =====
+    # 下跌(0) / 上涨(2) 权重大，中性(1) 小
+    class_weight = np.array([2.0, 0.3, 2.0])
+    grad *= class_weight[y][:, None]
+
+    # Hessian（近似）
+    hess = prob * (1.0 - prob)
+    hess *= class_weight[y][:, None]
+
+    return grad.reshape(-1), hess.reshape(-1)
+
 
 class XGBModel:
     """
@@ -32,34 +61,37 @@ class XGBModel:
         """
 
         params = {
-            "objective": "multi:softprob",
+            # "objective": "multi:softprob",
             "num_class": 3,
-            "eval_metric": "mlogloss",
-            "max_depth": 6,
-            "eta": 0.05,
-            "subsample": 0.8,
-            "colsample_bytree": 0.8,
-            "min_child_weight": 1,
-            "lambda": 1.0,
-            "alpha": 0.0,
-            # 🔥 GPU 关键参数
+            "eval_metric": ["mlogloss", "auc"],
+            "max_depth": 4,
+            "eta": 0.03,
+            "subsample": 0.7,
+            "colsample_bytree": 0.7,
+            "min_child_weight": 5,
+            "max_delta_step": 1,
+            "gamma": 1.0,
+            "lambda": 5.0,
+            "alpha": 0.5,
             "device": "cuda",
-            "tree_method": "hist",     # CPU-friendly & fast
+            "tree_method": "hist", 
             "seed": seed,
         }
 
-        dtrain = xgb.DMatrix(X_train, label=y_train)
+        # dtrain = xgb.DMatrix(X_train, label=y_train)
+        dtrain = xgb.QuantileDMatrix(X_train, label=y_train)
 
-        evals = [(dtrain, "train")]
+        # evals = [(dtrain, "train")]
         if X_valid is not None and y_valid is not None:
-            dvalid = xgb.DMatrix(X_valid, label=y_valid)
-            evals.append((dvalid, "valid"))
+            dvalid = xgb.QuantileDMatrix(X_valid, label=y_valid)
+            evals = [(dvalid, "valid")]
 
         self.model = xgb.train(
             params=params,
             dtrain=dtrain,
             num_boost_round=num_boost_round,
             evals=evals,
+            obj=pnl_weighted_softmax_obj, 
             early_stopping_rounds=early_stopping_rounds if len(evals) > 1 else None,
             verbose_eval=50,
         )
@@ -74,7 +106,8 @@ class XGBModel:
         """
         Returns probability: (N, 3)
         """
-        dmat = xgb.DMatrix(X)
+        # dmat = xgb.DMatrix(X)
+        dmat = xgb.QuantileDMatrix(X)
         return self.model.predict(dmat)
 
     # =========================
