@@ -23,7 +23,7 @@ class Predictor():
         y_pred = self.model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
-        signal[confidence < 0.6] = 1 # 信心不足时，预测为不变
+        signal[confidence < 0.55] = 1 # 信心不足时，预测为不变
         y.append(signal.tolist())
         y = np.array(y).T.tolist()
         # 确保返回格式为 List[List[int]]
@@ -37,6 +37,22 @@ class Predictor():
 
     def preprocess(self, x: Union[List[pd.DataFrame], pd.DataFrame]):
         return preprocess(x)
+
+def rolling_lr_k_r2(y: np.ndarray):
+    if len(y) < 2:
+        return 0.0, 0.0
+
+    x = np.arange(len(y), dtype=np.float32)
+    y_std = np.std(y)
+
+    if y_std < 1e-8:
+        return 0.0, 0.0
+
+    k, _ = np.polyfit(x, y, 1)
+    r = np.corrcoef(x, y)[0, 1]
+    r2 = r * r if np.isfinite(r) else 0.0
+    return k, r2
+
 
 def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
     """
@@ -53,7 +69,9 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'relative_spread2', 'relative_spread3', 'bsize1', 'bsize2', 'bsize3',
         'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5',
         'amount', 'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 'ask1_ma40', 'ask1_ma60',
-        'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', "time_label"
+        'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', "time_label",
+        'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
+        'obi_1', 'obi_3', 'mid_diff1', 'mid_diff2', 'mid_lr_k', 'mid_lr_r2',
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -119,25 +137,56 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
 
         # 时间标签
         df['time_label'] = assign_tick_time_labels(df['time'])
-        x[i] = df[new_columns]
+        
+        # 中间价线性回归
+        k, r2 = rolling_lr_k_r2(df['mid_price'].to_numpy()[-30:])
+        df['mid_lr_k'] = k
+        df['mid_lr_r2'] = r2
 
+        # 时间衰减盘口特征
+        decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
+        decay = decay / decay.sum()
+        def decay_mean(x):
+            w = decay[-len(x):]
+            return np.sum(x * w)
+        df['bid1_decay'] = df['bid1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        df['ask1_decay'] = df['ask1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        df['spread_decay'] = df['spread'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        df['bsize1_decay'] = df['bsize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        df['asize1_decay'] = df['asize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        
+        # 盘口不平衡
+        df['obi_1'] = (df['bsize1'] - df['asize1']) / (df['bsize1'] + df['asize1'] + 1e-6)
+        df['obi_3'] = (
+            df['bsize1'] + df['bsize2'] + df['bsize3']
+            - df['asize1'] - df['asize2'] - df['asize3']
+        ) / (
+            df['bsize1'] + df['bsize2'] + df['bsize3']
+            + df['asize1'] + df['asize2'] + df['asize3'] + 1e-6
+        )
+
+        # mid_price 动量
+        df['mid_diff1'] = df['mid_price'].diff().fillna(0)
+        df['mid_diff2'] = df['mid_diff1'].diff().fillna(0)
+
+        # print(f"df shape after stacking is {df.shape}") # (1994, D')
+        x[i] = df[new_columns]#.iloc[-1] # 只取最后一行作为特征。TODO：可以对上面的某些单点特征做 rolling 统计或者线性回归
+        # print(f"x shape after selecting new_columns is {x[i].shape}") # (1994, D)
     for df in x:
         # 使用 np.ascontiguousarray 确保数组内存连续，利于转换和性能
         arr = np.ascontiguousarray(df.values.astype(np.float32))
         arrays.append(arr)
     
-    x_hat = np.stack(arrays, axis=0)
+    x_hat = np.stack(arrays, axis=0) # (N, 1994, D)
     # print(f"x_hat shape after stacking is {x_hat.shape}")
     if N: # 训练时需要返回标签
         label = np.ascontiguousarray(label.values.astype(np.int8))
-        # print(f"label shape after conversion is {label.shape}")
-        # print(f"x_hat shape after stacking is {x_hat.shape}")
         return x_hat, label
 
-    scaler = np.load(os.path.join(os.path.dirname(__file__), 'scaler.npz'))
     x_hat = x_hat[:, -1, :]
-    x_hat[~np.isfinite(x_hat)] = np.nan
-    x_hat = factors_null_process_np(x_hat, medians=scaler['median'])
-    x_hat = extreme_process_MAD_np(x_hat, lower=scaler['mad_lower'], upper=scaler['mad_upper'], num=3)
-    x_hat = data_scale_Z_Score_np(x_hat, mean=scaler['mean'], std=scaler['std'])
-    return x_hat  # 只取最后一行
+    # scaler = np.load(os.path.join(os.path.dirname(__file__), 'scaler.npz'))
+    # x_hat[~np.isfinite(x_hat)] = np.nan
+    # x_hat = factors_null_process_np(x_hat, medians=scaler['median'])
+    # x_hat = extreme_process_MAD_np(x_hat, lower=scaler['mad_lower'], upper=scaler['mad_upper'], num=3)
+    # x_hat = data_scale_Z_Score_np(x_hat, mean=scaler['mean'], std=scaler['std'])
+    return x_hat

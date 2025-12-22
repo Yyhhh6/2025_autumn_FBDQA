@@ -61,7 +61,7 @@ class XGBModel:
         """
 
         params = {
-            # "objective": "multi:softprob",
+            "objective": "multi:softprob",
             "num_class": 3,
             "eval_metric": ["mlogloss", "auc"],
             "max_depth": 4,
@@ -91,12 +91,12 @@ class XGBModel:
             dtrain=dtrain,
             num_boost_round=num_boost_round,
             evals=evals,
-            obj=pnl_weighted_softmax_obj, 
+            # obj=pnl_weighted_softmax_obj, 
             early_stopping_rounds=early_stopping_rounds if len(evals) > 1 else None,
             verbose_eval=50,
         )
 
-        self.model.save_model(f"model_{N}.json")
+        self.model.save_model(f"mmpc/model_{N}.json")
         print(f"Model for N={N} trained and saved.")
 
     # =========================

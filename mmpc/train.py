@@ -36,7 +36,7 @@ def split_csv_files(
 
     csv_files.sort()  # 保证稳定
     random.seed(seed)
-    # random.shuffle(csv_files)
+    random.shuffle(csv_files)
 
     n = len(csv_files)
     n_train = int(n * train_ratio)
@@ -54,16 +54,18 @@ def extract_feature(files_dir, N):
     def process_file(file, N):
         if os.path.exists(file):
             df = pd.read_csv(file)[:-N]
+            
+            # TODO：数据预处理。还要去掉涨跌停的！！
+            # 这里的scalar是提前对数据集计算得到的
+            scaler = np.load(os.path.join(os.path.dirname(__file__), 'scaler.npz')) 
+            df = data_scale_Z_Score_np(df, mean=scaler['mean'], std=scaler['std'])
+
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
             df, labels = preprocess(df, N)
             df = df.squeeze(axis=0)
             labels = labels[99:]
-            # df_list = []
-            # for idx in range(len(df) - 99):
-            #     df_list.append(df[idx:idx+100])
-            # df_list = np.stack(df_list,axis=0)
             df_list = df[99:]
         else:
             print("file: ", file)
@@ -75,11 +77,12 @@ def extract_feature(files_dir, N):
 
     for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
         df, labels = process_file(file, N)
-        # print(f"Processed file {file}, df shape: {df.shape}, labels shape: {labels.shape}")
         data.append(df)
         labels_list.append(labels)
+
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
+
     return data, labels_list
 
 # raw_data → replace inf → replace nan → 去极值 (MAD 或百分位, train-based) → 标准化 (train-based)
@@ -89,29 +92,54 @@ for N in N_list:
     val_data, val_labels = extract_feature(files_dir=val_files, N=N)
     test_data, test_labels = extract_feature(files_dir=test_files, N=N)
     
+    # print(f"train data")
+    # nan_idx = np.argwhere(np.isnan(train_data))
+    # print(f"NaN 数量: {len(nan_idx)}")
+    # print("NaN 位置 (行, 列):", nan_idx)
+    # # Inf（包含 +inf 和 -inf）
+    # inf_idx = np.argwhere(np.isinf(train_data))
+    # print(f"Inf 数量: {len(inf_idx)}")
+    # print("Inf 位置 (行, 列):", inf_idx)
+    # print(f"val data")
+    # nan_idx = np.argwhere(np.isnan(val_data))
+    # print(f"NaN 数量: {len(nan_idx)}")
+    # print("NaN 位置 (行, 列):", nan_idx)
+    # # Inf（包含 +inf 和 -inf）
+    # inf_idx = np.argwhere(np.isinf(val_data))
+    # print(f"Inf 数量: {len(inf_idx)}")
+    # print("Inf 位置 (行, 列):", inf_idx)
+    # print(f"test data")
+    # nan_idx = np.argwhere(np.isnan(test_data))
+    # print(f"NaN 数量: {len(nan_idx)}")
+    # print("NaN 位置 (行, 列):", nan_idx)
+    # # Inf（包含 +inf 和 -inf）
+    # inf_idx = np.argwhere(np.isinf(test_data))
+    # print(f"Inf 数量: {len(inf_idx)}")
+    # print("NaN 位置 (行, 列):", nan_idx)
+
     # 替换inf
-    train_data[~np.isfinite(train_data)] = np.nan
-    val_data[~np.isfinite(val_data)]     = np.nan
-    test_data[~np.isfinite(test_data)]   = np.nan
+    # train_data[~np.isfinite(train_data)] = np.nan
+    # val_data[~np.isfinite(val_data)]     = np.nan
+    # test_data[~np.isfinite(test_data)]   = np.nan
 
     # 去NaN
     # TODO：tree_method="hist" 时，XGBoost 能处理 NaN，不需要额外处理
-    train_data, val_data, test_data, medians = factors_null_process_np(train=train_data, val=val_data, test=test_data)
+    # train_data, val_data, test_data, medians = factors_null_process_np(train=train_data, val=val_data, test=test_data)
 
     # 去极值（基于训练集统计量）
-    train_data, val_data, test_data, lower, upper = extreme_process_MAD_np(train=train_data, val=val_data, test=test_data, num=3)
+    # train_data, val_data, test_data, lower, upper = extreme_process_MAD_np(train=train_data, val=val_data, test=test_data, num=3)
     
-    # 归一化
-    train_data, val_data, test_data, mean, std = data_scale_Z_Score_np(train=train_data, val=val_data, test=test_data)
+    # 归一化。TODO：数据处理对每一个特征分别做
+    # train_data, val_data, test_data, mean, std = data_scale_Z_Score_np(train=train_data, val=val_data, test=test_data)
 
-    np.savez(
-        "mmpc/scaler.npz",
-        median=medians,
-        mad_lower=lower,
-        mad_upper=upper,
-        mean=mean,
-        std=std
-    )
+    # np.savez(
+    #     "mmpc/scaler.npz",
+    #     # median=medians,
+    #     # mad_lower=lower,
+    #     # mad_upper=upper,
+    #     mean=mean,
+    #     std=std
+    # )
 
     model = XGBModel()
     model.train(

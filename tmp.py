@@ -1,34 +1,66 @@
-# follow(user1, user2):->
-# def main(input_list: list):
-#     output = None
-#     skip_list = []
-#     for user1 in res_list:
-#         output = user1
-#         for user2 in input_list:
-#             if user1 != user2:
-#                 if follow(user1, user2):
-#                     output = None
-#                     break
-                
-#                 if not follow(user2, user1):
-#                     output = None
-#                     break
-#                 else:
-#                     res_list.remove(user2)
-#         if output is not None:
-#             return output
-#     return None
+# import os
+# import pandas as pd
 
-def main(input_list: list):
-    current_list = input_list.copy()
-    if current_list is not None:
-        current_list_ = []
-        for i in range(len(current_list),step=2):
-            user1 = input_list[i]
-            user2 = input_list[i+1]
-            if follow(user1, user2):
-                current_list_.append(user2)
-            else:
-                current_list_.append(user1)
-        current_list = current_list_
-    
+# data_dir = "/hdd/yyh/src/quant/data/data_raw"
+
+# for fname in os.listdir(data_dir):
+#     if not fname.endswith(".csv"):
+#         continue
+
+#     file_path = os.path.join(data_dir, fname)
+
+#     try:
+#         df = pd.read_csv(file_path)
+
+#         # 缺失值总数
+#         nan_count = df.isna().sum().sum()
+#         import numpy as np
+
+#         inf_count = np.isinf(df.select_dtypes(include='number')).sum().sum()
+
+#         if nan_count > 0 or inf_count > 0:
+#             print(f"{fname}: NaN={nan_count}, Inf={inf_count}")
+
+
+#     except Exception as e:
+#         print(f"{fname}: 读取失败，错误信息 -> {e}")
+
+import os
+import numpy as np
+import pandas as pd
+
+data_dir = "/hdd/yyh/src/quant/data/data_raw"
+
+all_data = []
+
+# 读取并汇总所有 csv
+for fname in os.listdir(data_dir):
+    if fname.endswith(".csv"):
+        path = os.path.join(data_dir, fname)
+        df = pd.read_csv(path)
+
+        # 强制转为数值，非数值变 NaN
+        df = df.apply(pd.to_numeric, errors="coerce")
+        all_data.append(df.to_numpy())
+
+# 拼接为 (N_total, D)
+data = np.vstack(all_data)
+
+# 统计量（按列）
+median = np.nanmedian(data, axis=0)
+mean = np.nanmean(data, axis=0)
+std = np.nanstd(data, axis=0)
+
+# 保存
+np.savez(
+    "scalar.npz",
+    median=median,
+    mean=mean,
+    std=std
+)
+
+print("Saved scalar.npz")
+print(f"Data shape: {data.shape}")
+print(f"Median: {median}")
+print(f"Mean: {mean}")
+print(f"Std: {std}")
