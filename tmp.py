@@ -38,13 +38,12 @@ for fname in os.listdir(data_dir):
     if fname.endswith(".csv"):
         path = os.path.join(data_dir, fname)
         df = pd.read_csv(path)
-
         # 强制转为数值，非数值变 NaN
         df = df.apply(pd.to_numeric, errors="coerce")
         all_data.append(df.to_numpy())
 
 # 拼接为 (N_total, D)
-data = np.vstack(all_data)
+data = np.vstack(all_data)[:, :-5]
 
 # 统计量（按列）
 median = np.nanmedian(data, axis=0)
@@ -53,7 +52,7 @@ std = np.nanstd(data, axis=0)
 
 # 保存
 np.savez(
-    "scalar.npz",
+    "scaler.npz",
     median=median,
     mean=mean,
     std=std

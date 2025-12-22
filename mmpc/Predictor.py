@@ -85,6 +85,8 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         label = pd.concat(labels, axis=0).reset_index(drop=True)
 
     for i, df in enumerate(x):
+        if N:
+            df = df.iloc[:, :-5]
         # 这里的scalar是提前对数据集计算得到的
         scaler = np.load(os.path.join(os.path.dirname(__file__), 'scaler.npz'))
         df = data_scale_Z_Score(df, mean=scaler['mean'], std=scaler['std'])
