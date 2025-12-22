@@ -96,14 +96,17 @@ def extreme_process_MAD(feature_names, train, val, test, num=3) -> pd.DataFrame:
     test[feature_names] = test[feature_names].clip(lower=lower, upper=upper, axis=1)
     return train, val, test
 
-def data_scale_Z_Score(data, feature_names=None):
+def data_scale_Z_Score(data, feature_names=None, mean=None, std=None) -> pd.DataFrame:
     if feature_names is not None:
         data_ = data[feature_names].copy()
         data_.loc[:, feature_names] = (
             data_.loc[:, feature_names] - data_.loc[:, feature_names].mean()) / (data_.loc[:, feature_names].std() + 1e-10)
     else:
         data_ = data.copy()
-        data_ = (data_ - data_.mean()) / (data_.std() + 1e-10)
+        if mean is not None and std is not None:
+            data_ = (data_ - mean) / (std + 1e-10)
+        else:
+            data_ = (data_ - data_.mean()) / (data_.std() + 1e-10)
     return data_
 
 def assign_tick_time_labels(tick_series: pd.Series) -> pd.Series:

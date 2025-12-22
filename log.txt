@@ -1,19 +1,19 @@
-Total CSV files: 1521, Train: 1064, Val: 304, Test: 153
-[0]	valid-mlogloss:1.08287	valid-auc:0.74596
-[50]	valid-mlogloss:0.74369	valid-auc:0.76190
-[100]	valid-mlogloss:0.68990	valid-auc:0.76952
-[150]	valid-mlogloss:0.67360	valid-auc:0.77634
-[200]	valid-mlogloss:0.66537	valid-auc:0.78121
-[250]	valid-mlogloss:0.66041	valid-auc:0.78451
-[300]	valid-mlogloss:0.65678	valid-auc:0.78696
-[350]	valid-mlogloss:0.65408	valid-auc:0.78887
-[400]	valid-mlogloss:0.65194	valid-auc:0.79033
-[450]	valid-mlogloss:0.65011	valid-auc:0.79158
-[500]	valid-mlogloss:0.64881	valid-auc:0.79246
-[550]	valid-mlogloss:0.64758	valid-auc:0.79329
-[600]	valid-mlogloss:0.64664	valid-auc:0.79389
-[650]	valid-mlogloss:0.64579	valid-auc:0.79444
-[700]	valid-mlogloss:0.64506	valid-auc:0.79491
-[750]	valid-mlogloss:0.64434	valid-auc:0.79539
-[799]	valid-mlogloss:0.64377	valid-auc:0.79575
+Total CSV files: 1521, Train: 1368, Val: 152, Test: 1
+[0]	valid-mlogloss:1.08304	valid-auc:0.73430
+[50]	valid-mlogloss:0.74848	valid-auc:0.76218
+[100]	valid-mlogloss:0.69269	valid-auc:0.76995
+[150]	valid-mlogloss:0.67464	valid-auc:0.77692
+[200]	valid-mlogloss:0.66494	valid-auc:0.78252
+[250]	valid-mlogloss:0.65877	valid-auc:0.78650
+[300]	valid-mlogloss:0.65425	valid-auc:0.78950
+[350]	valid-mlogloss:0.65111	valid-auc:0.79151
+[400]	valid-mlogloss:0.64871	valid-auc:0.79297
+[450]	valid-mlogloss:0.64671	valid-auc:0.79430
+[500]	valid-mlogloss:0.64525	valid-auc:0.79526
+[550]	valid-mlogloss:0.64393	valid-auc:0.79612
+[600]	valid-mlogloss:0.64265	valid-auc:0.79699
+[650]	valid-mlogloss:0.64160	valid-auc:0.79773
+[700]	valid-mlogloss:0.64060	valid-auc:0.79846
+[750]	valid-mlogloss:0.63963	valid-auc:0.79915
+[799]	valid-mlogloss:0.63873	valid-auc:0.79982
 Model for N=5 trained and saved.

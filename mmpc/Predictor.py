@@ -3,7 +3,7 @@ from typing import List, Union
 import pandas as pd
 import numpy as np
 from .model import XGBModel
-from .data_process import assign_tick_time_labels, factors_null_process_np, extreme_process_MAD_np, data_scale_Z_Score_np
+from .data_process import assign_tick_time_labels, data_scale_Z_Score
 
 class Predictor():
     def __init__(self):
@@ -72,6 +72,7 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', "time_label",
         'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
         'obi_1', 'obi_3', 'mid_diff1', 'mid_diff2', 'mid_lr_k', 'mid_lr_r2',
+        'high_20', 'low_20', 'high_50', 'low_50', 'high_100', 'low_100',
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -84,6 +85,10 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         label = pd.concat(labels, axis=0).reset_index(drop=True)
 
     for i, df in enumerate(x):
+        # 这里的scalar是提前对数据集计算得到的
+        scaler = np.load(os.path.join(os.path.dirname(__file__), 'scaler.npz'))
+        df = data_scale_Z_Score(df, mean=scaler['mean'], std=scaler['std'])
+
         # 价格+1（从涨跌幅还原到前收盘价的比例）
         df['bid1'] = df['n_bid1']+1
         df['bid2'] = df['n_bid2']+1
@@ -138,6 +143,14 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         # 时间标签
         df['time_label'] = assign_tick_time_labels(df['time'])
         
+        # 过去20、50、100个数据中的最高价和最低价
+        df['high_20'] = df['mid_price'].rolling(window=20, min_periods=1).max()
+        df['low_20'] = df['mid_price'].rolling(window=20, min_periods=1).min()
+        df['high_50'] = df['mid_price'].rolling(window=50, min_periods=1).max()
+        df['low_50'] = df['mid_price'].rolling(window=50, min_periods=1).min()
+        df['high_100'] = df['mid_price'].rolling(window=100, min_periods=1).max()
+        df['low_100'] = df['mid_price'].rolling(window=100, min_periods=1).min()
+
         # 中间价线性回归
         k, r2 = rolling_lr_k_r2(df['mid_price'].to_numpy()[-30:])
         df['mid_lr_k'] = k
@@ -173,7 +186,6 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         x[i] = df[new_columns]#.iloc[-1] # 只取最后一行作为特征。TODO：可以对上面的某些单点特征做 rolling 统计或者线性回归
         # print(f"x shape after selecting new_columns is {x[i].shape}") # (1994, D)
     for df in x:
-        # 使用 np.ascontiguousarray 确保数组内存连续，利于转换和性能
         arr = np.ascontiguousarray(df.values.astype(np.float32))
         arrays.append(arr)
     
@@ -184,9 +196,4 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         return x_hat, label
 
     x_hat = x_hat[:, -1, :]
-    # scaler = np.load(os.path.join(os.path.dirname(__file__), 'scaler.npz'))
-    # x_hat[~np.isfinite(x_hat)] = np.nan
-    # x_hat = factors_null_process_np(x_hat, medians=scaler['median'])
-    # x_hat = extreme_process_MAD_np(x_hat, lower=scaler['mad_lower'], upper=scaler['mad_upper'], num=3)
-    # x_hat = data_scale_Z_Score_np(x_hat, mean=scaler['mean'], std=scaler['std'])
     return x_hat
