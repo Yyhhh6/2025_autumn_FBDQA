@@ -19,11 +19,10 @@ class Predictor():
         print(f"Received {len(x)} dataframes for prediction.")
         x_hat = self.preprocess(x)
         y = []
-        # for _ in range(1): # TODO
         y_pred = self.model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
-        signal[confidence < 0.55] = 1 # 信心不足时，预测为不变
+        signal[confidence < 0.6] = 1 # 信心不足时，预测为不变
         y.append(signal.tolist())
         y = np.array(y).T.tolist()
         # 确保返回格式为 List[List[int]]
@@ -69,10 +68,7 @@ def time_fixed_sample(df, cols, lags=[1, 2, 3, 5, 10, 20, 30, 50, 80]):
         for c in cols:
             col_name = f'{c}_lag{lag}'
             arr = np.full(n, np.nan, dtype=np.float32)
-
-            # 关键修复点：用 iloc
             arr[lag:] = df[c].iloc[:valid_len].values
-
             lag_features[col_name] = arr
 
     lag_df = pd.DataFrame(lag_features, index=df.index)
