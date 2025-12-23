@@ -2,20 +2,19 @@ import pandas as pd
 from datetime import datetime, timedelta
 import numpy as np
 
+def factors_null_process_np(train, val=None, test=None, medians=None):
+    if medians is None:
+        medians = np.nanmedian(train, axis=0)
 
-def factors_null_process_np(train, val, test):
-    """
-    feature_idx: List[int]，需要处理的列索引
-    train/val/test: np.ndarray, shape (N, D)
-    """
-    # 计算训练集特征列的中位数（忽略 NaN）
-    medians = np.nanmedian(train, axis=0)
-
-    for data in (train, val, test):
-        mask = np.isnan(data)
-        data[mask] = medians[np.where(mask)[1]]
-
-    return train, val, test
+    if val is not None and test is not None:
+        for data in (train, val, test):
+            mask = np.isnan(data)
+            data[mask] = medians[np.where(mask)[1]]
+        return train, val, test, medians
+    else:
+        mask = np.isnan(train)
+        train[mask] = medians[np.where(mask)[1]]
+        return train
 
 def calc_MAD_params_np(input, num=3):
     """
@@ -30,35 +29,84 @@ def calc_MAD_params_np(input, num=3):
     return lower, upper
 
 
-def extreme_process_MAD_np(train, val, test, num=3):
-    lower, upper = calc_MAD_params_np(train, num)
+def extreme_process_MAD_np(train, val=None, test=None, lower=None, upper=None, num=3):
+    if lower is None or upper is None:
+        lower, upper = calc_MAD_params_np(train, num)
 
-    for data in (train, val, test):
-        data = np.clip(data, lower, upper)
+    if val is not None and test is not None:
+        for data in (train, val, test):
+            np.clip(data, lower, upper, out=data)
+        return train, val, test, lower, upper
+    else:
+        np.clip(train, lower, upper, out=train)
+        return train
 
+def calc_mean_std_np(data, mean=None, std=None):
+    mean = np.nanmean(data, axis=0)
+    std = np.nanstd(data, axis=0)
+    return (data - mean) / (std + 1e-10), mean, std
+
+def data_scale_Z_Score_np(train, val=None, test=None, mean=None, std=None):
+    if mean is not None and std is not None:
+        train = (train - mean) / (std + 1e-10)
+        return train
+    else:
+        train, mean, std = calc_mean_std_np(train)
+        val = (val - mean) / (std + 1e-10)
+        test = (test - mean) / (std + 1e-10)
+        return train, val, test, mean, std
+
+
+def check_finite_pandas(df): 
+    return not np.isinf(df.select_dtypes(include=[np.number])).any().any()
+def check_nan_pandas(df):
+    return not df.isna().any().any()
+
+def factors_null_process(feature_names: list, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
+    medians = train[feature_names].median()
+
+    # 使用训练集的中位数填充 train/val/test
+    train[feature_names] = train[feature_names].fillna(medians)
+    val[feature_names] = val[feature_names].fillna(medians)
+    test[feature_names] = test[feature_names].fillna(medians)
+    
     return train, val, test
 
-
-def data_scale_Z_Score_np(data, feature_idx=None):
-    """
-    data: np.ndarray, shape (N, D)
-    feature_idx: List[int] or None
-    """
+       
+def remove_outliers(data: pd.DataFrame, feature_names: list, lower_quantile: float = 0.01, upper_quantile: float = 0.99) -> pd.DataFrame:
+    ''' 去除异常值，使用分位数法 '''
     data_ = data.copy()
+    for feature in feature_names:
+        lower_bound = data_[feature].quantile(lower_quantile)
+        upper_bound = data_[feature].quantile(upper_quantile)
+        data_ = data_[(data_[feature] >= lower_bound) & (data_[feature] <= upper_bound)]
+    return data_
 
-    if feature_idx is not None:
-        sub = data_[:, feature_idx]
+def calc_MAD_params(train, feature_names, num=3):
+    median = train[feature_names].median(axis=0)
+    mad = (train[feature_names].sub(median).abs()).median(axis=0)
+    lower = median - num * 1.4826 * mad
+    upper = median + num * 1.4826 * mad
+    return lower, upper
 
-        mean = np.nanmean(sub, axis=0)
-        std = np.nanstd(sub, axis=0)
+def extreme_process_MAD(feature_names, train, val, test, num=3) -> pd.DataFrame:
+    lower, upper = calc_MAD_params(train, feature_names, num)
+    train[feature_names] = train[feature_names].clip(lower=lower, upper=upper, axis=1)
+    val[feature_names] = val[feature_names].clip(lower=lower, upper=upper, axis=1)
+    test[feature_names] = test[feature_names].clip(lower=lower, upper=upper, axis=1)
+    return train, val, test
 
-        data_[:, feature_idx] = (sub - mean) / (std + 1e-10)
+def data_scale_Z_Score(data, feature_names=None, mean=None, std=None) -> pd.DataFrame:
+    if feature_names is not None:
+        data_ = data[feature_names].copy()
+        data_.loc[:, feature_names] = (
+            data_.loc[:, feature_names] - data_.loc[:, feature_names].mean()) / (data_.loc[:, feature_names].std() + 1e-10)
     else:
-        mean = np.nanmean(data_, axis=0)
-        std = np.nanstd(data_, axis=0)
-
-        data_ = (data_ - mean) / (std + 1e-10)
-
+        data_ = data.copy()
+        if mean is not None and std is not None:
+            data_ = (data_ - mean) / (std + 1e-10)
+        else:
+            data_ = (data_ - data_.mean()) / (data_.std() + 1e-10)
     return data_
 
 def assign_tick_time_labels(tick_series: pd.Series) -> pd.Series:

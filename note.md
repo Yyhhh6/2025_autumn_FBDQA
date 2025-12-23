@@ -34,6 +34,15 @@
 4. cal_pnl计算流程是否正确？
 5. 中间价和盘口价的原始数据都已经标准化了，之后还需要标准化吗？？（可能标准化的范围不一样:sym?date?）
 6. 对犯的不同错误设置不同的损失：把recall降一降，提高precision和pnl
+    将loss改为CostSensitiveLoss。原来loss的结果：
+        [PyTorch] Epoch 27 train_loss=0.5993 val_f0.5_macro=0.5851 precision_macro=0.6230 recall_macro=0.5159
+        Early stopping.
+        MLP N=5 test f0.5_macro: 0.5915 precision_macro: 0.6323 recall_macro: 0.5186
+        MLP N=5 PnL: -3,452 Return: -34.52% Sharpe: -5.87 WinRate: 36.54%
+        {5: {'mlp': ({'accuracy': 0.7496720693554466, 'precision_macro': 0.6323089804773292, 'recall_macro': 0.5185705717380541, 'f0.5_macro': 0.5915046396277752, 'f1_macro': 0.5515886813964958, 'confusion_matrix': array([[ 3001,  5750,   607],
+            [ 1973, 43715,  1601],
+            [  663,  6009,  3006]]), 'pnl_total_pnl': np.float64(-3451.739667863193), 'pnl_total_return': np.float64(-0.3451739667863193), 'pnl_annual_return': np.float64(-0.9013763999765746), 'pnl_sharpe_ratio': np.float64(-5.873635639960603), 'pnl_max_drawdown': np.float64(-0.3619289194839038), 'pnl_win_rate': np.float64(0.3654312015503876), 'pnl_total_trades': np.float64(8256.0), 'pnl_winning_trades': np.int64(3017), 'pnl_losing_trades': np.int64(7586), 'pnl_avg_win': np.float64(0.0010396817763373323), 'pnl_avg_loss': np.float64(-0.000467510057216965), 'pnl_profit_loss_ratio': np.float64(2.2238703965566886), 'pnl_volatility': np.float64(0.0006336964351880505), 'pnl_long_only_return': np.float64(0.0421590267197649), 'pnl_long_only_sharpe': np.float64(1.0072271597954479), 'pnl_position_coverage': np.float64(0.1636034677723332), 'pnl_trading_frequency': np.float64(0.1244779494911421)}, './results/mlp_N5.pt')}}
+
 7. 决策树的选择
     
     📌 总结对比
