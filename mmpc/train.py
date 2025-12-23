@@ -94,7 +94,7 @@ for N in N_list:
         train_labels,
         val_data,
         val_labels,
-        num_boost_round=800,
-        early_stopping_rounds=100,
+        num_boost_round=1500,
+        early_stopping_rounds=150,
         N=N,
     )
