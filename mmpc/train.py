@@ -9,6 +9,8 @@ from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, log_loss, mean_squared_log_error
 from tqdm import tqdm
 
+# 去掉涨跌停的文件
+EXCLUDE_FILES = ['./data/data_raw/snapshot_sym1_date33_pm.csv', './data/data_raw/snapshot_sym7_date42_am.csv', './data/data_raw/snapshot_sym1_date25_am.csv', './data/data_raw/snapshot_sym6_date32_pm.csv', './data/data_raw/snapshot_sym4_date33_pm.csv', './data/data_raw/snapshot_sym2_date59_pm.csv', './data/data_raw/snapshot_sym1_date26_pm.csv', './data/data_raw/snapshot_sym2_date59_am.csv', './data/data_raw/snapshot_sym2_date57_pm.csv', './data/data_raw/snapshot_sym4_date34_am.csv', './data/data_raw/snapshot_sym5_date38_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym1_date33_am.csv', './data/data_raw/snapshot_sym1_date34_pm.csv', './data/data_raw/snapshot_sym0_date63_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym7_date10_pm.csv', './data/data_raw/snapshot_sym4_date32_pm.csv', './data/data_raw/snapshot_sym6_date42_pm.csv', './data/data_raw/snapshot_sym4_date33_am.csv', './data/data_raw/snapshot_sym7_date42_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv', './data/data_raw/snapshot_sym2_date42_pm.csv', './data/data_raw/snapshot_sym4_date34_pm.csv', './data/data_raw/snapshot_sym1_date25_pm.csv', './data/data_raw/snapshot_sym5_date23_pm.csv', './data/data_raw/snapshot_sym6_date33_pm.csv', './data/data_raw/snapshot_sym4_date31_pm.csv', './data/data_raw/snapshot_sym7_date10_am.csv']
 
 TRAIN_RATIO = 0.9
 VAL_RATIO = 0.1 
@@ -31,10 +33,11 @@ def split_csv_files(
     csv_files = [
         os.path.join(data_dir, f)
         for f in os.listdir(data_dir)
-        if f.endswith(".csv")
+        if f.endswith(".csv") and 
+        os.path.join(data_dir, f) not in EXCLUDE_FILES
     ]
 
-    csv_files.sort()  # 保证稳定
+    csv_files.sort() 
     random.seed(seed)
     random.shuffle(csv_files)
 
@@ -54,9 +57,6 @@ def extract_feature(files_dir, N):
     def process_file(file, N):
         if os.path.exists(file):
             df = pd.read_csv(file)[:-N]
-            
-            # TODO：数据预处理。还要去掉涨跌停的！！
-            
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
