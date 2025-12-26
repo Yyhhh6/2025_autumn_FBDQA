@@ -64,13 +64,13 @@ class XGBModel:
             "objective": "multi:softprob",
             "num_class": 3,
             "eval_metric": ["mlogloss", "auc", "merror"],
-            "max_depth": 3,
+            "max_depth": 4,   # 3 → 4
             "eta": 0.02,
-            "subsample": 0.5,
-            "colsample_bytree": 0.48,
-            "min_child_weight": 18,
+            "subsample": 0.5,   # 0.5 → 0.6
+            "colsample_bytree": 0.48,   # 0.48 → 0.35 / 0.4
+            "min_child_weight": 12,   # 18 → 10 / 12
             "max_delta_step": 1,
-            "gamma": 4.3,
+            "gamma": 4.3,    # 4.3 → 2.0 / 3.0
             "lambda": 7.5,
             "alpha": 0.25,
             "device": "cuda",
