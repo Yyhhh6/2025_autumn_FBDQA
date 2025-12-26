@@ -149,7 +149,7 @@ def test(test_files, N, model):
     # model = XGBModel("mmpc/model_20.json")
     y_pred = model.predict(test_data)   # (N, 3)
 
-    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]
+    target_confidences = [0.6, 0.65, 0.7, 0.75, 0.8, 0.85]
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
         confidence = np.max(y_pred, axis=1)
@@ -216,7 +216,7 @@ if __name__ == "__main__":
             train_labels,
             val_data,
             val_labels,
-            num_boost_round=4000,
+            num_boost_round=400,
             early_stopping_rounds=150,
             N=N,
         )

@@ -91,7 +91,7 @@ class XGBModel:
             dtrain=dtrain,
             num_boost_round=num_boost_round,
             evals=evals,
-            # obj=pnl_weighted_softmax_obj, 
+            obj=pnl_weighted_softmax_obj, 
             early_stopping_rounds=early_stopping_rounds if len(evals) > 1 else None,
             verbose_eval=50,
         )
