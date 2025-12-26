@@ -148,50 +148,55 @@ def test(test_files, N, model):
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
     # model = XGBModel("mmpc/model_20.json")
     y_pred = model.predict(test_data)   # (N, 3)
-    confidence = np.max(y_pred, axis=1)
-    signal = np.argmax(y_pred, axis=1)
-    signal[confidence < 0.6] = 1 # 信心不足时，预测为不变
-    y = signal
-    print(f"y shape: {y.shape}, test_labels shape: {test_labels.shape}")
-    from sklearn.metrics import classification_report, precision_score, recall_score, fbeta_score
-    print(f"Results for N={N}:")
-    # print(classification_report(test_labels, y, digits=4))
-    # Recall：真实上涨/下跌中，被预测正确的比例
-    index_recall = test_labels != 1
-    recall = sum(y[index_recall] == test_labels[index_recall]) / sum(index_recall)
-    # Precision：预测上涨/下跌中，预测正确的比例
-    index_precision = y != 1
-    precision = sum(y[index_precision] == test_labels[index_precision]) / sum(index_precision)
-    beta = 0.5
-    f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"F0.5:      {f05:.4f}")
-    pnl = []
 
-    for i, s in enumerate(signal):
-        if i + N >= len(n_midprice):
-            # pnl.append(0)
-            continue
-        if s == 2:      # Long
-            pnl.append(n_midprice[i+N] - n_midprice[i])
-        elif s == 0:    # Short
-            pnl.append(n_midprice[i] - n_midprice[i+N])
-        # else:           # Hold
-        #     pnl.append(0)
+    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]
+    for target_confidence in target_confidences:
+        print(f"************target_confidence={target_confidence}************")
+        confidence = np.max(y_pred, axis=1)
+        signal = np.argmax(y_pred, axis=1)
+        signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
+        y = signal
+        print(f"y shape: {y.shape}, test_labels shape: {test_labels.shape}")
+        from sklearn.metrics import classification_report, precision_score, recall_score, fbeta_score
+        print(f"Results for N={N}:")
+        # print(classification_report(test_labels, y, digits=4))
+        # Recall：真实上涨/下跌中，被预测正确的比例
+        index_recall = test_labels != 1
+        print("index_recall: ", index_recall)
+        recall = sum(y[index_recall] == test_labels[index_recall]) / sum(index_recall)
+        # Precision：预测上涨/下跌中，预测正确的比例
+        index_precision = y != 1
+        precision = sum(y[index_precision] == test_labels[index_precision]) / sum(index_precision)
+        beta = 0.5
+        f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall:    {recall:.4f}")
+        print(f"F0.5:      {f05:.4f}")
+        pnl = []
 
-    pnl = np.array(pnl)
-    total_pnl = pnl.sum()
-    avg_pnl = pnl.mean()
-    trade_pnl = pnl[pnl != 0]
+        for i, s in enumerate(signal):
+            if i + N >= len(n_midprice):
+                # pnl.append(0)
+                continue
+            if s == 2:      # Long
+                pnl.append(n_midprice[i+N] - n_midprice[i])
+            elif s == 0:    # Short
+                pnl.append(n_midprice[i] - n_midprice[i+N])
+            # else:           # Hold
+            #     pnl.append(0)
 
-    win_rate = (trade_pnl > 0).mean()
-    num_trades = len(trade_pnl)
+        pnl = np.array(pnl)
+        total_pnl = pnl.sum()
+        avg_pnl = pnl.mean()
+        trade_pnl = pnl[pnl != 0]
 
-    print(f"Total PNL:   {total_pnl:.4f}")
-    print(f"Avg PNL:     {avg_pnl:.6f}")
-    print(f"Trades:      {num_trades}")
-    print(f"Win Rate:    {win_rate:.3f}")
+        win_rate = (trade_pnl > 0).mean()
+        num_trades = len(trade_pnl)
+
+        print(f"Total PNL:   {total_pnl:.4f}")
+        print(f"Avg PNL:     {avg_pnl:.6f}")
+        print(f"Trades:      {num_trades}")
+        print(f"Win Rate:    {win_rate:.3f}")
 
 if __name__ == "__main__":
     # process_file(file='./data/data_raw/snapshot_sym1_date33_pm.csv', N=10)

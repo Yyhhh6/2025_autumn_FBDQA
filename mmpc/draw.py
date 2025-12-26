@@ -63,6 +63,18 @@ def rolling_lr_k_r2(y: np.ndarray):
     r2 = r * r if np.isfinite(r) else 0.0
     return k, r2
 
+def rolling_lr_features(y, window=30):
+    ks = np.zeros(len(y))
+    r2s = np.zeros(len(y))
+
+    for i in range(len(y)):
+        sub = y[max(0, i-window+1):i+1]
+        k, r2 = rolling_lr_k_r2(sub)
+        ks[i] = k
+        r2s[i] = r2
+
+    return ks, r2s
+
 def time_fixed_sample(df, cols, lags=[1, 2, 3, 5, 10, 20, 30, 50, 80]):
     """
     基于 position（iloc）的固定 lag 采样
@@ -169,9 +181,14 @@ df['low_100'] = df['mid_price'].rolling(window=100, min_periods=1).min()
 
 # ---------- 滚动线性回归 ----------
 # 中间价线性回归（TODO: 可能是最有用的特征）
-k, r2 = rolling_lr_k_r2(df['mid_price'].to_numpy()[-30:])
+k, r2 = rolling_lr_features(df['mid_price'].to_numpy())
 df['mid_lr_k'] = k   # 斜率
+df['mid_lr_k_relative'] = k / (df['mid_price'] + 1e-6)
 df['mid_lr_r2'] = r2   # 拟合优度
+df['mid_trend_strength'] = np.sign(k) * r2
+
+print("k: ", k)
+print("r2: ", r2)
 
 # ---------- 时间衰减盘口特征 ----------
 # 时间衰减盘口特征
@@ -230,9 +247,9 @@ df['idx'] = range(len(df))
 # 盘口不均衡
 # features_to_plot = ['mid_price', 'obi_1', 'obi_3']
 # 一阶动量与二阶动量
-features_to_plot = ['mid_price', 'mid_diff1', 'mid_diff2']
+# features_to_plot = ['mid_price', 'mid_diff1', 'mid_diff2']
 # 斜率与拟合优度
-# features_to_plot = ['mid_price', 'mid_lr_k', 'mid_lr_r2']
+features_to_plot = ['mid_price', 'mid_lr_k', 'mid_lr_r2', 'mid_lr_k_relative', 'mid_trend_strength']
 
 # 6. 调用绘图
 plot_features(df, features_to_plot)

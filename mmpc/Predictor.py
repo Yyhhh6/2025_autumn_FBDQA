@@ -96,12 +96,9 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
     3. 堆叠所有 tensor 形成一个 batch，并移动到指定设备上
     """
     arrays = []
-    raw_cols = ["n_close",
-        # "amount_delta", "n_midprice",
-        # "n_bid1", "n_bsize1", "n_bid2", "n_bsize2", "n_bid3", "n_bsize3",
-        # "n_bid4", "n_bsize4", "n_bid5", "n_bsize5", "n_ask1", "n_asize1",
-        # "n_ask2", "n_asize2", "n_ask3", "n_asize3", "n_ask4", "n_asize4",
-        # "n_ask5", "n_asize5",
+
+    lags1=[1, 2, 3, 4, 5, 10, 15, 20, 30, 40, 50, 60]
+    raw_cols1 = ["n_close", "sym",
         'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 'ask1', 'ask2', 'ask3', 'ask4','ask5',
         'spread', 'spread2', 'spread3',
         'mid_price', 'mid_price2', 'mid_price3', 'mid_price4', 'mid_price5', 
@@ -110,7 +107,7 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'spread_diff1', "spread_diff2", 'spread2_diff1', "spread2_diff2", 'spread3_diff1', "spread3_diff2", 
         'relative_spread_diff1', "relative_spread_diff2", 'relative_spread2_diff1', "relative_spread2_diff2", 'relative_spread3_diff1', "relative_spread3_diff2", 
         'bsize1', 'bsize2', 'bsize3', 'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount',  
-        'mid_price_ma5', 'mid_price_ma10', 'mid_price_ma20', 'mid_price_ma40', 'mid_price_ma60', 
+        'mid_price_ma5', 'mid_price_ma10', 'mid_price_ma20', 
         "time_label", 'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
         'obi_1', 'obi_3', 'mid_diff1', 'mid_diff2', 
         'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
@@ -119,14 +116,23 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 
         'high_20', 'low_20', 'pos_20', 
         'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
+        # 'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
+        # 'mid_diff2_lr_k', 'mid_diff2_lr_r2', 'mid_diff2_trend_strength',
+        # 'trend_regime', 'trend_strength_gated', 'price_move_capacity', 'trend_liquidity_ratio'
     ]
 
-    lags=[1, 2, 3, 4, 5, 10, 20, 30, 50, 80]
-    new_columns = [
+    lags2=[1, 2, 3, 4, 5, 10, 15, 20]
+    raw_cols2 = [
+        # 'trend_persistence', 'trend_flip', 'trend_age',
+        'mid_price_ma40', 'mid_price_ma60', 
         'ask1_ma40', 'ask1_ma60',
         'bid1_ma40', 'bid1_ma60',
-        'high_50', 'low_50', 'high_100', 'low_100', 
-        'pos_50', 'pos_100',
+        'high_50', 'low_50', 'pos_50',
+        # 'trend_align_10_30', 'trend_align_30_60', 'trend_confidence'
+    ]
+
+    new_columns = [
+        'high_100', 'low_100', 'pos_100',
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -243,6 +249,37 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['mid_lr_r2'] = r2   # 拟合优度
         df['mid_trend_strength'] = np.sign(k) * r2
 
+        # # 信号的持续性
+        # df['trend_persistence'] = (
+        #     df['mid_trend_strength']
+        #     .rolling(20)
+        #     .apply(lambda x: np.sum(np.sign(x) == np.sign(x.iloc[-1])))
+        # )
+        # df['trend_flip'] = (np.sign(df['mid_lr_k']).diff() != 0).astype(int)
+        # df['trend_age'] = df['trend_flip'].rolling(50).sum()
+
+        # # 门控
+        # df['trend_regime'] = (
+        #     (df['mid_lr_r2'] > 0.25) &
+        #     (np.abs(df['mid_lr_k']) > np.percentile(np.abs(df['mid_lr_k']), 60))
+        # ).astype(int)
+        # df['trend_strength_gated'] = df['mid_trend_strength'] * df['trend_regime']
+
+        # k_10, r2_10 = rolling_lr_features(df['mid_price'], window=10)
+        # k_30, r2_30 = rolling_lr_features(df['mid_price'], window=30)
+        # k_60, r2_60 = rolling_lr_features(df['mid_price'], window=60)
+        # df['trend_align_10_30'] = (np.sign(k_10) == np.sign(k_30)).astype(int)
+        # df['trend_align_30_60'] = (np.sign(k_30) == np.sign(k_60)).astype(int)
+        # df['trend_confidence'] = (
+        #     np.sign(k_10) * r2_10 +
+        #     np.sign(k_30) * r2_30 +
+        #     np.sign(k_60) * r2_60
+        # )
+
+        # # 盘口是否允许价格往某个方向动？
+        # df['price_move_capacity'] = df['mid_lr_k'] / (df['relative_spread'] + 1e-6)
+        # df['trend_liquidity_ratio'] = df['mid_trend_strength'] / (df['relative_spread'] + 1e-6)
+
         # 时间衰减盘口特征
         decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
         decay = decay / decay.sum()
@@ -271,6 +308,18 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         # mid_price 动量
         df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
         df['mid_diff2'] = df['mid_diff1'].diff().fillna(0)   # 二阶差分：加速度
+        
+        # # mid_diff1线性回归
+        # k, r2 = rolling_lr_features(df['mid_diff1'].to_numpy())
+        # df['mid_diff1_lr_k'] = k   # 斜率
+        # df['mid_diff1_lr_r2'] = r2   # 拟合优度
+        # df['mid_diff1_trend_strength'] = np.sign(k) * r2
+
+        # # mid_diff2线性回归
+        # k, r2 = rolling_lr_features(df['mid_diff2'].to_numpy())
+        # df['mid_diff2_lr_k'] = k   # 斜率
+        # df['mid_diff2_lr_r2'] = r2   # 拟合优度
+        # df['mid_diff2_trend_strength'] = np.sign(k) * r2
 
         # 价格冲击方向
         df['trade_impact'] = df['mid_diff1'] * df['amount']
@@ -285,24 +334,21 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['ask_depth_slope'] = (df['asize5'] - df['asize1']) / 4
 
         # 时间衰减采样历史数据（TODO: 这个数据太多了，真的有用吗？）
-        df = time_fixed_sample(df, raw_cols, lags=lags)
-        # sampled_cols = [c for c in df.columns if '_lag' in c]
-        # new_columns = new_columns + sampled_cols
-        # print(f"new_columns is {new_columns}")
-        # print()
-
-        # print(f"df shape after stacking is {df.shape}") # (1994, D')
+        df = time_fixed_sample(df, raw_cols1, lags=lags1)
         df = df.copy()
-        # print("len(raw_cols): ", len(raw_cols))
-        # print("len(lags): ", len(lags))
-        # print("len(new_columns): ", len(new_columns))
-        for c in raw_cols:
-            for lag in lags:
-                col_name = f'{c}_lag{lag}'
-                new_columns.append(col_name)
-        # print("len(new_columns): ", len(new_columns))
-        x[i] = df[new_columns]#.iloc[-1] # 只取最后一行作为特征。TODO：可以对上面的某些单点特征做 rolling 统计或者线性回归
-        # print(f"x shape after selecting new_columns is {x[i].shape}") # (1994, D)
+
+        df = time_fixed_sample(df, raw_cols2, lags=lags2)
+        df = df.copy()
+
+        lag_cols1 = [f'{c}_lag{lag}' for c in raw_cols1 for lag in lags1]
+        lag_cols2 = [f'{c}_lag{lag}' for c in raw_cols2 for lag in lags2]
+        final_columns = (
+            new_columns
+            + lag_cols1
+            + lag_cols2
+        )
+        x[i] = df[final_columns]
+
     for df in x:
         arr = np.ascontiguousarray(df.values.astype(np.float32))
         arrays.append(arr)
