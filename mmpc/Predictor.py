@@ -52,7 +52,19 @@ def rolling_lr_k_r2(y: np.ndarray):
     r2 = r * r if np.isfinite(r) else 0.0
     return k, r2
 
-def time_fixed_sample(df, cols, lags=[1, 2, 3, 5, 10, 20, 30, 50, 80]):
+def rolling_lr_features(y, window=30):
+    ks = np.zeros(len(y))
+    r2s = np.zeros(len(y))
+
+    for i in range(len(y)):
+        sub = y[max(0, i-window+1):i+1]
+        k, r2 = rolling_lr_k_r2(sub)
+        ks[i] = k
+        r2s[i] = r2
+
+    return ks, r2s
+
+def time_fixed_sample(df, cols, lags=[1, 2, 3, 4, 5, 10, 20, 30, 40, 60]):
     """
     基于 position（iloc）的固定 lag 采样
     适用于训练 + 推理，index 任意
@@ -84,26 +96,37 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
     3. 堆叠所有 tensor 形成一个 batch，并移动到指定设备上
     """
     arrays = []
-    raw_cols = ["n_close", "amount_delta", "n_midprice",
-    "n_bid1", "n_bsize1", "n_bid2", "n_bsize2", "n_bid3", "n_bsize3",
-    "n_bid4", "n_bsize4", "n_bid5", "n_bsize5", "n_ask1", "n_asize1",
-    "n_ask2", "n_asize2", "n_ask3", "n_asize3", "n_ask4", "n_asize4",
-    "n_ask5", "n_asize5"]
-
-    new_columns = [
-        'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 'ask1', 'ask2', 'ask3', 'ask4','ask5', 
-        'spread', 'spread2', 'spread3', 
+    raw_cols = ["n_close",
+        # "amount_delta", "n_midprice",
+        # "n_bid1", "n_bsize1", "n_bid2", "n_bsize2", "n_bid3", "n_bsize3",
+        # "n_bid4", "n_bsize4", "n_bid5", "n_bsize5", "n_ask1", "n_asize1",
+        # "n_ask2", "n_asize2", "n_ask3", "n_asize3", "n_ask4", "n_asize4",
+        # "n_ask5", "n_asize5",
+        'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 'ask1', 'ask2', 'ask3', 'ask4','ask5',
+        'spread', 'spread2', 'spread3',
         'mid_price', 'mid_price2', 'mid_price3', 'mid_price4', 'mid_price5', 
-        'weighted_ab1', 'weighted_ab2', 'weighted_ab3', 'relative_spread',
-        'relative_spread2', 'relative_spread3', 'bsize1', 'bsize2', 'bsize3',
-        'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount', 
-        'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 'ask1_ma40', 'ask1_ma60',
-        'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', 
+        'weighted_ab1', 'weighted_ab2', 'weighted_ab3', 
+        'relative_spread', 'relative_spread2', 'relative_spread3', 
+        'spread_diff1', "spread_diff2", 'spread2_diff1', "spread2_diff2", 'spread3_diff1', "spread3_diff2", 
+        'relative_spread_diff1', "relative_spread_diff2", 'relative_spread2_diff1', "relative_spread2_diff2", 'relative_spread3_diff1', "relative_spread3_diff2", 
+        'bsize1', 'bsize2', 'bsize3', 'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount',  
         'mid_price_ma5', 'mid_price_ma10', 'mid_price_ma20', 'mid_price_ma40', 'mid_price_ma60', 
         "time_label", 'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
-        'obi_1', 'obi_3', 'mid_diff1', 'mid_diff2', 'mid_lr_k', 'mid_lr_r2',
-        'high_20', 'low_20', 'high_50', 'low_50', 'high_100', 'low_100', 
-        # 'n_close_lag1', 'amount_delta_lag1', 'n_midprice_lag1', 'n_bid1_lag1', 'n_bsize1_lag1', 'n_bid2_lag1', 'n_bsize2_lag1', 'n_bid3_lag1', 'n_bsize3_lag1', 'n_bid4_lag1', 'n_bsize4_lag1', 'n_bid5_lag1', 'n_bsize5_lag1', 'n_ask1_lag1', 'n_asize1_lag1', 'n_ask2_lag1', 'n_asize2_lag1', 'n_ask3_lag1', 'n_asize3_lag1', 'n_ask4_lag1', 'n_asize4_lag1', 'n_ask5_lag1', 'n_asize5_lag1', 'n_close_lag2', 'amount_delta_lag2', 'n_midprice_lag2', 'n_bid1_lag2', 'n_bsize1_lag2', 'n_bid2_lag2', 'n_bsize2_lag2', 'n_bid3_lag2', 'n_bsize3_lag2', 'n_bid4_lag2', 'n_bsize4_lag2', 'n_bid5_lag2', 'n_bsize5_lag2', 'n_ask1_lag2', 'n_asize1_lag2', 'n_ask2_lag2', 'n_asize2_lag2', 'n_ask3_lag2', 'n_asize3_lag2', 'n_ask4_lag2', 'n_asize4_lag2', 'n_ask5_lag2', 'n_asize5_lag2', 'n_close_lag3', 'amount_delta_lag3', 'n_midprice_lag3', 'n_bid1_lag3', 'n_bsize1_lag3', 'n_bid2_lag3', 'n_bsize2_lag3', 'n_bid3_lag3', 'n_bsize3_lag3', 'n_bid4_lag3', 'n_bsize4_lag3', 'n_bid5_lag3', 'n_bsize5_lag3', 'n_ask1_lag3', 'n_asize1_lag3', 'n_ask2_lag3', 'n_asize2_lag3', 'n_ask3_lag3', 'n_asize3_lag3', 'n_ask4_lag3', 'n_asize4_lag3', 'n_ask5_lag3', 'n_asize5_lag3', 'n_close_lag5', 'amount_delta_lag5', 'n_midprice_lag5', 'n_bid1_lag5', 'n_bsize1_lag5', 'n_bid2_lag5', 'n_bsize2_lag5', 'n_bid3_lag5', 'n_bsize3_lag5', 'n_bid4_lag5', 'n_bsize4_lag5', 'n_bid5_lag5', 'n_bsize5_lag5', 'n_ask1_lag5', 'n_asize1_lag5', 'n_ask2_lag5', 'n_asize2_lag5', 'n_ask3_lag5', 'n_asize3_lag5', 'n_ask4_lag5', 'n_asize4_lag5', 'n_ask5_lag5', 'n_asize5_lag5', 'n_close_lag10', 'amount_delta_lag10', 'n_midprice_lag10', 'n_bid1_lag10', 'n_bsize1_lag10', 'n_bid2_lag10', 'n_bsize2_lag10', 'n_bid3_lag10', 'n_bsize3_lag10', 'n_bid4_lag10', 'n_bsize4_lag10', 'n_bid5_lag10', 'n_bsize5_lag10', 'n_ask1_lag10', 'n_asize1_lag10', 'n_ask2_lag10', 'n_asize2_lag10', 'n_ask3_lag10', 'n_asize3_lag10', 'n_ask4_lag10', 'n_asize4_lag10', 'n_ask5_lag10', 'n_asize5_lag10', 'n_close_lag20', 'amount_delta_lag20', 'n_midprice_lag20', 'n_bid1_lag20', 'n_bsize1_lag20', 'n_bid2_lag20', 'n_bsize2_lag20', 'n_bid3_lag20', 'n_bsize3_lag20', 'n_bid4_lag20', 'n_bsize4_lag20', 'n_bid5_lag20', 'n_bsize5_lag20', 'n_ask1_lag20', 'n_asize1_lag20', 'n_ask2_lag20', 'n_asize2_lag20', 'n_ask3_lag20', 'n_asize3_lag20', 'n_ask4_lag20', 'n_asize4_lag20', 'n_ask5_lag20', 'n_asize5_lag20', 'n_close_lag30', 'amount_delta_lag30', 'n_midprice_lag30', 'n_bid1_lag30', 'n_bsize1_lag30', 'n_bid2_lag30', 'n_bsize2_lag30', 'n_bid3_lag30', 'n_bsize3_lag30', 'n_bid4_lag30', 'n_bsize4_lag30', 'n_bid5_lag30', 'n_bsize5_lag30', 'n_ask1_lag30', 'n_asize1_lag30', 'n_ask2_lag30', 'n_asize2_lag30', 'n_ask3_lag30', 'n_asize3_lag30', 'n_ask4_lag30', 'n_asize4_lag30', 'n_ask5_lag30', 'n_asize5_lag30', 'n_close_lag50', 'amount_delta_lag50', 'n_midprice_lag50', 'n_bid1_lag50', 'n_bsize1_lag50', 'n_bid2_lag50', 'n_bsize2_lag50', 'n_bid3_lag50', 'n_bsize3_lag50', 'n_bid4_lag50', 'n_bsize4_lag50', 'n_bid5_lag50', 'n_bsize5_lag50', 'n_ask1_lag50', 'n_asize1_lag50', 'n_ask2_lag50', 'n_asize2_lag50', 'n_ask3_lag50', 'n_asize3_lag50', 'n_ask4_lag50', 'n_asize4_lag50', 'n_ask5_lag50', 'n_asize5_lag50', 'n_close_lag80', 'amount_delta_lag80', 'n_midprice_lag80', 'n_bid1_lag80', 'n_bsize1_lag80', 'n_bid2_lag80', 'n_bsize2_lag80', 'n_bid3_lag80', 'n_bsize3_lag80', 'n_bid4_lag80', 'n_bsize4_lag80', 'n_bid5_lag80', 'n_bsize5_lag80', 'n_ask1_lag80', 'n_asize1_lag80', 'n_ask2_lag80', 'n_asize2_lag80', 'n_ask3_lag80', 'n_asize3_lag80', 'n_ask4_lag80', 'n_asize4_lag80', 'n_ask5_lag80', 'n_asize5_lag80'
+        'obi_1', 'obi_3', 'mid_diff1', 'mid_diff2', 
+        'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
+        'bid_depth_slope', 'ask_depth_slope', 'obi_sq', 
+        'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 
+        'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 
+        'high_20', 'low_20', 'pos_20', 
+        'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
+    ]
+
+    lags=[1, 2, 3, 4, 5, 10, 20, 30, 50, 80]
+    new_columns = [
+        'ask1_ma40', 'ask1_ma60',
+        'bid1_ma40', 'bid1_ma60',
+        'high_50', 'low_50', 'high_100', 'low_100', 
+        'pos_50', 'pos_100',
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -153,6 +176,19 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['relative_spread'] = df['spread'] / df['mid_price']
         df['relative_spread2'] = df['spread2'] / df['mid_price2']
         df['relative_spread3'] = df['spread3'] / df['mid_price3']
+        # 价差变化
+        df['spread_diff1'] = df['spread'].diff().fillna(0)
+        df['spread_diff2'] = df['spread_diff1'].diff().fillna(0)
+        df['spread2_diff1'] = df['spread2'].diff().fillna(0)
+        df['spread2_diff2'] = df['spread2_diff1'].diff().fillna(0)
+        df['spread3_diff1'] = df['spread3'].diff().fillna(0)
+        df['spread3_diff2'] = df['spread3_diff1'].diff().fillna(0)
+        df['relative_spread_diff1'] = df['relative_spread'].diff().fillna(0)
+        df['relative_spread_diff2'] = df['relative_spread_diff1'].diff().fillna(0)
+        df['relative_spread2_diff1'] = df['relative_spread2'].diff().fillna(0)
+        df['relative_spread2_diff2'] = df['relative_spread2_diff1'].diff().fillna(0)
+        df['relative_spread3_diff1'] = df['relative_spread3'].diff().fillna(0)
+        df['relative_spread3_diff2'] = df['relative_spread3_diff1'].diff().fillna(0)
 
         # 对量取对数（量的尺度压缩）
         df['bsize1'] = df['n_bsize1'].map(np.log1p)
@@ -196,10 +232,16 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['high_100'] = df['mid_price'].rolling(window=100, min_periods=1).max()
         df['low_100'] = df['mid_price'].rolling(window=100, min_periods=1).min()
 
+        # 相对位置
+        df['pos_20'] = (df['mid_price'] - df['low_20']) / (df['high_20'] - df['low_20'] + 1e-6)
+        df['pos_50'] = (df['mid_price'] - df['low_50']) / (df['high_50'] - df['low_50'] + 1e-6)
+        df['pos_100'] = (df['mid_price'] - df['low_100']) / (df['high_100'] - df['low_100'] + 1e-6)
+
         # 中间价线性回归（TODO: 可能是最有用的特征）
-        k, r2 = rolling_lr_k_r2(df['mid_price'].to_numpy()[-30:])
+        k, r2 = rolling_lr_features(df['mid_price'].to_numpy())
         df['mid_lr_k'] = k   # 斜率
         df['mid_lr_r2'] = r2   # 拟合优度
+        df['mid_trend_strength'] = np.sign(k) * r2
 
         # 时间衰减盘口特征
         decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
@@ -223,12 +265,27 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
             + df['asize1'] + df['asize2'] + df['asize3'] + 1e-6
         )
 
+        # 盘口不对称强度（引入非线性信号给树模型试试）
+        df['obi_sq'] = df['obi_3'] * np.abs(df['obi_3'])
+
         # mid_price 动量
         df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
         df['mid_diff2'] = df['mid_diff1'].diff().fillna(0)   # 二阶差分：加速度
 
+        # 价格冲击方向
+        df['trade_impact'] = df['mid_diff1'] * df['amount']
+        df['signed_amount'] = np.sign(df['mid_diff1']) * df['amount']
+
+        # 量价背离
+        df['price_up_amount_down'] = (df['mid_diff1'] > 0).astype(int) * (df['amount'].diff() < 0).astype(int)
+        df['amount_price_div'] = df['mid_diff1'] / (df['amount'] + 1e-6)
+
+        # 盘口斜率
+        df['bid_depth_slope'] = (df['bsize5'] - df['bsize1']) / 4
+        df['ask_depth_slope'] = (df['asize5'] - df['asize1']) / 4
+
         # 时间衰减采样历史数据（TODO: 这个数据太多了，真的有用吗？）
-        df = time_fixed_sample(df, raw_cols, lags=[1, 2, 3, 5, 10, 20, 30, 50, 80])
+        df = time_fixed_sample(df, raw_cols, lags=lags)
         # sampled_cols = [c for c in df.columns if '_lag' in c]
         # new_columns = new_columns + sampled_cols
         # print(f"new_columns is {new_columns}")
@@ -236,7 +293,14 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
 
         # print(f"df shape after stacking is {df.shape}") # (1994, D')
         df = df.copy()
-        # print("new_columns: ", new_columns)
+        # print("len(raw_cols): ", len(raw_cols))
+        # print("len(lags): ", len(lags))
+        # print("len(new_columns): ", len(new_columns))
+        for c in raw_cols:
+            for lag in lags:
+                col_name = f'{c}_lag{lag}'
+                new_columns.append(col_name)
+        # print("len(new_columns): ", len(new_columns))
         x[i] = df[new_columns]#.iloc[-1] # 只取最后一行作为特征。TODO：可以对上面的某些单点特征做 rolling 统计或者线性回归
         # print(f"x shape after selecting new_columns is {x[i].shape}") # (1994, D)
     for df in x:

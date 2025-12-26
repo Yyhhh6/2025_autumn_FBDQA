@@ -103,6 +103,7 @@ for N in N_list:
     # print(classification_report(test_labels, y, digits=4))
     # Recall：真实上涨/下跌中，被预测正确的比例
     index_recall = test_labels != 1
+    print("index_recall: ", index_recall)
     recall = sum(y[index_recall] == test_labels[index_recall]) / sum(index_recall)
     # Precision：预测上涨/下跌中，预测正确的比例
     index_precision = y != 1
@@ -116,14 +117,14 @@ for N in N_list:
 
     for i, s in enumerate(signal):
         if i + N >= len(n_midprice):
-            pnl.append(0)
+            # pnl.append(0)
             continue
         if s == 2:      # Long
             pnl.append(n_midprice[i+N] - n_midprice[i])
         elif s == 0:    # Short
             pnl.append(n_midprice[i] - n_midprice[i+N])
-        else:           # Hold
-            pnl.append(0)
+        # else:           # Hold
+        #     pnl.append(0)
 
     pnl = np.array(pnl)
     total_pnl = pnl.sum()

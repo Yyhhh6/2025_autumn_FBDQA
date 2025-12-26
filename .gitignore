@@ -81,3 +81,5 @@ credentials.json
 
 # Docker override (optional)
 docker-compose.override.yml
+
+mmpc/model_20.json
