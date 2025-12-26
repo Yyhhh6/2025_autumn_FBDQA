@@ -1,2 +1,0 @@
-Feature extraction done, saved 0 files to ./data/data_extract_feature
-All files checked for row count.

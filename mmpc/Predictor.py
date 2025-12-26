@@ -9,7 +9,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -92,16 +92,18 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
 
     new_columns = [
         'bid1', 'bid2', 'bid3', 'bid4', 'bid5', 'ask1', 'ask2', 'ask3', 'ask4','ask5', 
-        'spread', 'spread2', 'spread3', 'mid_price', 'mid_price2', 'mid_price3',
+        'spread', 'spread2', 'spread3', 
+        'mid_price', 'mid_price2', 'mid_price3', 'mid_price4', 'mid_price5', 
         'weighted_ab1', 'weighted_ab2', 'weighted_ab3', 'relative_spread',
         'relative_spread2', 'relative_spread3', 'bsize1', 'bsize2', 'bsize3',
-        'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5',
-        'amount', 'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 'ask1_ma40', 'ask1_ma60',
-        'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', "time_label",
-        'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
+        'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount', 
+        'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 'ask1_ma40', 'ask1_ma60',
+        'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 'bid1_ma60', 
+        'mid_price_ma5', 'mid_price_ma10', 'mid_price_ma20', 'mid_price_ma40', 'mid_price_ma60', 
+        "time_label", 'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
         'obi_1', 'obi_3', 'mid_diff1', 'mid_diff2', 'mid_lr_k', 'mid_lr_r2',
         'high_20', 'low_20', 'high_50', 'low_50', 'high_100', 'low_100', 
-        'n_close_lag1', 'amount_delta_lag1', 'n_midprice_lag1', 'n_bid1_lag1', 'n_bsize1_lag1', 'n_bid2_lag1', 'n_bsize2_lag1', 'n_bid3_lag1', 'n_bsize3_lag1', 'n_bid4_lag1', 'n_bsize4_lag1', 'n_bid5_lag1', 'n_bsize5_lag1', 'n_ask1_lag1', 'n_asize1_lag1', 'n_ask2_lag1', 'n_asize2_lag1', 'n_ask3_lag1', 'n_asize3_lag1', 'n_ask4_lag1', 'n_asize4_lag1', 'n_ask5_lag1', 'n_asize5_lag1', 'n_close_lag2', 'amount_delta_lag2', 'n_midprice_lag2', 'n_bid1_lag2', 'n_bsize1_lag2', 'n_bid2_lag2', 'n_bsize2_lag2', 'n_bid3_lag2', 'n_bsize3_lag2', 'n_bid4_lag2', 'n_bsize4_lag2', 'n_bid5_lag2', 'n_bsize5_lag2', 'n_ask1_lag2', 'n_asize1_lag2', 'n_ask2_lag2', 'n_asize2_lag2', 'n_ask3_lag2', 'n_asize3_lag2', 'n_ask4_lag2', 'n_asize4_lag2', 'n_ask5_lag2', 'n_asize5_lag2', 'n_close_lag3', 'amount_delta_lag3', 'n_midprice_lag3', 'n_bid1_lag3', 'n_bsize1_lag3', 'n_bid2_lag3', 'n_bsize2_lag3', 'n_bid3_lag3', 'n_bsize3_lag3', 'n_bid4_lag3', 'n_bsize4_lag3', 'n_bid5_lag3', 'n_bsize5_lag3', 'n_ask1_lag3', 'n_asize1_lag3', 'n_ask2_lag3', 'n_asize2_lag3', 'n_ask3_lag3', 'n_asize3_lag3', 'n_ask4_lag3', 'n_asize4_lag3', 'n_ask5_lag3', 'n_asize5_lag3', 'n_close_lag5', 'amount_delta_lag5', 'n_midprice_lag5', 'n_bid1_lag5', 'n_bsize1_lag5', 'n_bid2_lag5', 'n_bsize2_lag5', 'n_bid3_lag5', 'n_bsize3_lag5', 'n_bid4_lag5', 'n_bsize4_lag5', 'n_bid5_lag5', 'n_bsize5_lag5', 'n_ask1_lag5', 'n_asize1_lag5', 'n_ask2_lag5', 'n_asize2_lag5', 'n_ask3_lag5', 'n_asize3_lag5', 'n_ask4_lag5', 'n_asize4_lag5', 'n_ask5_lag5', 'n_asize5_lag5', 'n_close_lag10', 'amount_delta_lag10', 'n_midprice_lag10', 'n_bid1_lag10', 'n_bsize1_lag10', 'n_bid2_lag10', 'n_bsize2_lag10', 'n_bid3_lag10', 'n_bsize3_lag10', 'n_bid4_lag10', 'n_bsize4_lag10', 'n_bid5_lag10', 'n_bsize5_lag10', 'n_ask1_lag10', 'n_asize1_lag10', 'n_ask2_lag10', 'n_asize2_lag10', 'n_ask3_lag10', 'n_asize3_lag10', 'n_ask4_lag10', 'n_asize4_lag10', 'n_ask5_lag10', 'n_asize5_lag10', 'n_close_lag20', 'amount_delta_lag20', 'n_midprice_lag20', 'n_bid1_lag20', 'n_bsize1_lag20', 'n_bid2_lag20', 'n_bsize2_lag20', 'n_bid3_lag20', 'n_bsize3_lag20', 'n_bid4_lag20', 'n_bsize4_lag20', 'n_bid5_lag20', 'n_bsize5_lag20', 'n_ask1_lag20', 'n_asize1_lag20', 'n_ask2_lag20', 'n_asize2_lag20', 'n_ask3_lag20', 'n_asize3_lag20', 'n_ask4_lag20', 'n_asize4_lag20', 'n_ask5_lag20', 'n_asize5_lag20', 'n_close_lag30', 'amount_delta_lag30', 'n_midprice_lag30', 'n_bid1_lag30', 'n_bsize1_lag30', 'n_bid2_lag30', 'n_bsize2_lag30', 'n_bid3_lag30', 'n_bsize3_lag30', 'n_bid4_lag30', 'n_bsize4_lag30', 'n_bid5_lag30', 'n_bsize5_lag30', 'n_ask1_lag30', 'n_asize1_lag30', 'n_ask2_lag30', 'n_asize2_lag30', 'n_ask3_lag30', 'n_asize3_lag30', 'n_ask4_lag30', 'n_asize4_lag30', 'n_ask5_lag30', 'n_asize5_lag30', 'n_close_lag50', 'amount_delta_lag50', 'n_midprice_lag50', 'n_bid1_lag50', 'n_bsize1_lag50', 'n_bid2_lag50', 'n_bsize2_lag50', 'n_bid3_lag50', 'n_bsize3_lag50', 'n_bid4_lag50', 'n_bsize4_lag50', 'n_bid5_lag50', 'n_bsize5_lag50', 'n_ask1_lag50', 'n_asize1_lag50', 'n_ask2_lag50', 'n_asize2_lag50', 'n_ask3_lag50', 'n_asize3_lag50', 'n_ask4_lag50', 'n_asize4_lag50', 'n_ask5_lag50', 'n_asize5_lag50', 'n_close_lag80', 'amount_delta_lag80', 'n_midprice_lag80', 'n_bid1_lag80', 'n_bsize1_lag80', 'n_bid2_lag80', 'n_bsize2_lag80', 'n_bid3_lag80', 'n_bsize3_lag80', 'n_bid4_lag80', 'n_bsize4_lag80', 'n_bid5_lag80', 'n_bsize5_lag80', 'n_ask1_lag80', 'n_asize1_lag80', 'n_ask2_lag80', 'n_asize2_lag80', 'n_ask3_lag80', 'n_asize3_lag80', 'n_ask4_lag80', 'n_asize4_lag80', 'n_ask5_lag80', 'n_asize5_lag80'
+        # 'n_close_lag1', 'amount_delta_lag1', 'n_midprice_lag1', 'n_bid1_lag1', 'n_bsize1_lag1', 'n_bid2_lag1', 'n_bsize2_lag1', 'n_bid3_lag1', 'n_bsize3_lag1', 'n_bid4_lag1', 'n_bsize4_lag1', 'n_bid5_lag1', 'n_bsize5_lag1', 'n_ask1_lag1', 'n_asize1_lag1', 'n_ask2_lag1', 'n_asize2_lag1', 'n_ask3_lag1', 'n_asize3_lag1', 'n_ask4_lag1', 'n_asize4_lag1', 'n_ask5_lag1', 'n_asize5_lag1', 'n_close_lag2', 'amount_delta_lag2', 'n_midprice_lag2', 'n_bid1_lag2', 'n_bsize1_lag2', 'n_bid2_lag2', 'n_bsize2_lag2', 'n_bid3_lag2', 'n_bsize3_lag2', 'n_bid4_lag2', 'n_bsize4_lag2', 'n_bid5_lag2', 'n_bsize5_lag2', 'n_ask1_lag2', 'n_asize1_lag2', 'n_ask2_lag2', 'n_asize2_lag2', 'n_ask3_lag2', 'n_asize3_lag2', 'n_ask4_lag2', 'n_asize4_lag2', 'n_ask5_lag2', 'n_asize5_lag2', 'n_close_lag3', 'amount_delta_lag3', 'n_midprice_lag3', 'n_bid1_lag3', 'n_bsize1_lag3', 'n_bid2_lag3', 'n_bsize2_lag3', 'n_bid3_lag3', 'n_bsize3_lag3', 'n_bid4_lag3', 'n_bsize4_lag3', 'n_bid5_lag3', 'n_bsize5_lag3', 'n_ask1_lag3', 'n_asize1_lag3', 'n_ask2_lag3', 'n_asize2_lag3', 'n_ask3_lag3', 'n_asize3_lag3', 'n_ask4_lag3', 'n_asize4_lag3', 'n_ask5_lag3', 'n_asize5_lag3', 'n_close_lag5', 'amount_delta_lag5', 'n_midprice_lag5', 'n_bid1_lag5', 'n_bsize1_lag5', 'n_bid2_lag5', 'n_bsize2_lag5', 'n_bid3_lag5', 'n_bsize3_lag5', 'n_bid4_lag5', 'n_bsize4_lag5', 'n_bid5_lag5', 'n_bsize5_lag5', 'n_ask1_lag5', 'n_asize1_lag5', 'n_ask2_lag5', 'n_asize2_lag5', 'n_ask3_lag5', 'n_asize3_lag5', 'n_ask4_lag5', 'n_asize4_lag5', 'n_ask5_lag5', 'n_asize5_lag5', 'n_close_lag10', 'amount_delta_lag10', 'n_midprice_lag10', 'n_bid1_lag10', 'n_bsize1_lag10', 'n_bid2_lag10', 'n_bsize2_lag10', 'n_bid3_lag10', 'n_bsize3_lag10', 'n_bid4_lag10', 'n_bsize4_lag10', 'n_bid5_lag10', 'n_bsize5_lag10', 'n_ask1_lag10', 'n_asize1_lag10', 'n_ask2_lag10', 'n_asize2_lag10', 'n_ask3_lag10', 'n_asize3_lag10', 'n_ask4_lag10', 'n_asize4_lag10', 'n_ask5_lag10', 'n_asize5_lag10', 'n_close_lag20', 'amount_delta_lag20', 'n_midprice_lag20', 'n_bid1_lag20', 'n_bsize1_lag20', 'n_bid2_lag20', 'n_bsize2_lag20', 'n_bid3_lag20', 'n_bsize3_lag20', 'n_bid4_lag20', 'n_bsize4_lag20', 'n_bid5_lag20', 'n_bsize5_lag20', 'n_ask1_lag20', 'n_asize1_lag20', 'n_ask2_lag20', 'n_asize2_lag20', 'n_ask3_lag20', 'n_asize3_lag20', 'n_ask4_lag20', 'n_asize4_lag20', 'n_ask5_lag20', 'n_asize5_lag20', 'n_close_lag30', 'amount_delta_lag30', 'n_midprice_lag30', 'n_bid1_lag30', 'n_bsize1_lag30', 'n_bid2_lag30', 'n_bsize2_lag30', 'n_bid3_lag30', 'n_bsize3_lag30', 'n_bid4_lag30', 'n_bsize4_lag30', 'n_bid5_lag30', 'n_bsize5_lag30', 'n_ask1_lag30', 'n_asize1_lag30', 'n_ask2_lag30', 'n_asize2_lag30', 'n_ask3_lag30', 'n_asize3_lag30', 'n_ask4_lag30', 'n_asize4_lag30', 'n_ask5_lag30', 'n_asize5_lag30', 'n_close_lag50', 'amount_delta_lag50', 'n_midprice_lag50', 'n_bid1_lag50', 'n_bsize1_lag50', 'n_bid2_lag50', 'n_bsize2_lag50', 'n_bid3_lag50', 'n_bsize3_lag50', 'n_bid4_lag50', 'n_bsize4_lag50', 'n_bid5_lag50', 'n_bsize5_lag50', 'n_ask1_lag50', 'n_asize1_lag50', 'n_ask2_lag50', 'n_asize2_lag50', 'n_ask3_lag50', 'n_asize3_lag50', 'n_ask4_lag50', 'n_asize4_lag50', 'n_ask5_lag50', 'n_asize5_lag50', 'n_close_lag80', 'amount_delta_lag80', 'n_midprice_lag80', 'n_bid1_lag80', 'n_bsize1_lag80', 'n_bid2_lag80', 'n_bsize2_lag80', 'n_bid3_lag80', 'n_bsize3_lag80', 'n_bid4_lag80', 'n_bsize4_lag80', 'n_bid5_lag80', 'n_bsize5_lag80', 'n_ask1_lag80', 'n_asize1_lag80', 'n_ask2_lag80', 'n_asize2_lag80', 'n_ask3_lag80', 'n_asize3_lag80', 'n_ask4_lag80', 'n_asize4_lag80', 'n_ask5_lag80', 'n_asize5_lag80'
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -110,8 +112,10 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
     if N: # 训练时需要返回标签
         labels = []
         for df in x:
-            labels.append(df['label_5'])
+            labels.append(df['label_20'])
+            # print("df['label_20'] shape: ", df['label_20'].shape)
         label = pd.concat(labels, axis=0).reset_index(drop=True)
+        # print("label shape:", label.shape)
 
     for i, df in enumerate(x):
         # if N:
@@ -139,14 +143,18 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['mid_price'] = (df['ask1'] + df['bid1']) / 2
         df['mid_price2'] = (df['ask2'] + df['bid2']) / 2
         df['mid_price3'] = (df['ask3'] + df['bid3']) / 2
+        df['mid_price4'] = (df['ask4'] + df['bid4']) / 2
+        df['mid_price5'] = (df['ask5'] + df['bid5']) / 2
+        # 加权买卖价，如果立即成交，价格更偏向于哪一方
         df['weighted_ab1'] = (df['ask1'] * df['n_bsize1'] + df['bid1'] * df['n_asize1']) / (df['n_asize1'] + df['n_bsize1'])
         df['weighted_ab2'] = (df['ask2'] * df['n_bsize2'] + df['bid2'] * df['n_asize2']) / (df['n_asize2'] + df['n_bsize2'])
         df['weighted_ab3'] = (df['ask3'] * df['n_bsize3'] + df['bid3'] * df['n_asize3']) / (df['n_asize3'] + df['n_bsize3'])
+        # 相对价差，无量纲化流动性
         df['relative_spread'] = df['spread'] / df['mid_price']
         df['relative_spread2'] = df['spread2'] / df['mid_price2']
         df['relative_spread3'] = df['spread3'] / df['mid_price3']
 
-        # 对量取对数
+        # 对量取对数（量的尺度压缩）
         df['bsize1'] = df['n_bsize1'].map(np.log1p)
         df['bsize2'] = df['n_bsize2'].map(np.log1p)
         df['bsize3'] = df['n_bsize3'].map(np.log1p)
@@ -157,6 +165,7 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['asize3'] = df['n_asize3'].map(np.log1p)
         df['asize4'] = df['n_asize4'].map(np.log1p)
         df['asize5'] = df['n_asize5'].map(np.log1p)
+        # 从上个tick到当前tick发生的成交金额，单位元
         df['amount'] = df['amount_delta'].map(np.log1p)
 
         # 均线特征
@@ -170,11 +179,16 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['bid1_ma20'] = df['bid1'].rolling(window=20, min_periods=1).mean()
         df['bid1_ma40'] = df['bid1'].rolling(window=40, min_periods=1).mean()
         df['bid1_ma60'] = df['bid1'].rolling(window=60, min_periods=1).mean()
+        df['mid_price_ma5'] = df['mid_price'].rolling(window=5, min_periods=1).mean()
+        df['mid_price_ma10'] = df['mid_price'].rolling(window=10, min_periods=1).mean()
+        df['mid_price_ma20'] = df['mid_price'].rolling(window=20, min_periods=1).mean()
+        df['mid_price_ma40'] = df['mid_price'].rolling(window=40, min_periods=1).mean()
+        df['mid_price_ma60'] = df['mid_price'].rolling(window=60, min_periods=1).mean()
 
-        # 时间标签
+        # 时间标签（TODO: check准确性）
         df['time_label'] = assign_tick_time_labels(df['time'])
         
-        # 过去20、50、100个数据中的最高价和最低价
+        # 过去20、50、100个数据中的最高价和最低价（TODO: 是否有用）
         df['high_20'] = df['mid_price'].rolling(window=20, min_periods=1).max()
         df['low_20'] = df['mid_price'].rolling(window=20, min_periods=1).min()
         df['high_50'] = df['mid_price'].rolling(window=50, min_periods=1).max()
@@ -182,10 +196,10 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['high_100'] = df['mid_price'].rolling(window=100, min_periods=1).max()
         df['low_100'] = df['mid_price'].rolling(window=100, min_periods=1).min()
 
-        # 中间价线性回归
+        # 中间价线性回归（TODO: 可能是最有用的特征）
         k, r2 = rolling_lr_k_r2(df['mid_price'].to_numpy()[-30:])
-        df['mid_lr_k'] = k
-        df['mid_lr_r2'] = r2
+        df['mid_lr_k'] = k   # 斜率
+        df['mid_lr_r2'] = r2   # 拟合优度
 
         # 时间衰减盘口特征
         decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
@@ -210,10 +224,10 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         )
 
         # mid_price 动量
-        df['mid_diff1'] = df['mid_price'].diff().fillna(0)
-        df['mid_diff2'] = df['mid_diff1'].diff().fillna(0)
+        df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
+        df['mid_diff2'] = df['mid_diff1'].diff().fillna(0)   # 二阶差分：加速度
 
-        # 时间衰减采样历史数据
+        # 时间衰减采样历史数据（TODO: 这个数据太多了，真的有用吗？）
         df = time_fixed_sample(df, raw_cols, lags=[1, 2, 3, 5, 10, 20, 30, 50, 80])
         # sampled_cols = [c for c in df.columns if '_lag' in c]
         # new_columns = new_columns + sampled_cols
@@ -222,6 +236,7 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
 
         # print(f"df shape after stacking is {df.shape}") # (1994, D')
         df = df.copy()
+        # print("new_columns: ", new_columns)
         x[i] = df[new_columns]#.iloc[-1] # 只取最后一行作为特征。TODO：可以对上面的某些单点特征做 rolling 统计或者线性回归
         # print(f"x shape after selecting new_columns is {x[i].shape}") # (1994, D)
     for df in x:

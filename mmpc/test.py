@@ -17,7 +17,7 @@ VAL_RATIO = 0.0
 SEED = 42
 
 # N_list = [5, 10, 20, 40, 60]
-N_list = [5]
+N_list = [20]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
 file_dir="./data/data_raw"
 
@@ -90,7 +90,7 @@ for N in N_list:
     train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
     test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=N)
     print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
-    model = XGBModel("/hdd/yyh/src/quant/mmpc/model.json")
+    model = XGBModel("mmpc/model_20.json")
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
     y_pred = model.predict(test_data)   # (N, 3)
     confidence = np.max(y_pred, axis=1)

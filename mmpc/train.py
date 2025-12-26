@@ -17,7 +17,7 @@ VAL_RATIO = 0.05
 SEED = 42
 
 # N_list = [5, 10, 20, 40, 60]
-N_list = [5]
+N_list = [20]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
 file_dir="./data/data_raw"
 
@@ -61,7 +61,8 @@ def extract_feature(files_dir, N):
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
             df, labels = preprocess(df, N)
-            df = df.squeeze(axis=0)
+            df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
+            # 去除前100个tick
             labels = labels[99:]
             df_list = df[99:]
         else:
@@ -82,19 +83,51 @@ def extract_feature(files_dir, N):
 
     return data, labels_list
 
-for N in N_list:
-    train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
-    train_data, train_labels = extract_feature(files_dir=train_files, N=N)
-    val_data, val_labels = extract_feature(files_dir=val_files, N=N)
-    test_data, test_labels = extract_feature(files_dir=test_files, N=N)
-    
-    model = XGBModel()
-    model.train(
-        train_data,
-        train_labels,
-        val_data,
-        val_labels,
-        num_boost_round=1500,
-        early_stopping_rounds=150,
-        N=N,
-    )
+def process_file(file, N):
+    if os.path.exists(file):
+        df = pd.read_csv(file)#[:-N]
+        print("raw df shape:", df.shape)
+        if df.empty:
+            raise ValueError(f"File {file} is empty.")
+        
+        df = df.reset_index(drop=True)
+        df, labels = preprocess(df, N)
+        print("after preprocess df shape:", df.shape)
+        print("after preprocess labels shape:", labels.shape)
+
+        df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
+        print("after squeeze df shape:", df.shape)
+
+        # 去除前100个tick
+        labels = labels[99:]
+        df_list = df[99:]
+        print("after cut 99 df shape:", df_list.shape)
+        print("after cut 99 labels shape:", labels.shape)
+    else:
+        print("file: ", file)
+        raise FileNotFoundError(f"File {file} not found.")
+    return df_list, labels
+
+if __name__ == "__main__":
+    # process_file(file='./data/data_raw/snapshot_sym1_date33_pm.csv', N=10)
+    # exit(0)
+
+    for N in N_list:
+        # 划分训练集、验证集、测试集
+        train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+
+        # 提取训练集、验证集、测试集的特征
+        train_data, train_labels = extract_feature(files_dir=train_files, N=N)
+        val_data, val_labels = extract_feature(files_dir=val_files, N=N)
+        test_data, test_labels = extract_feature(files_dir=test_files, N=N)
+        
+        model = XGBModel()
+        model.train(
+            train_data,
+            train_labels,
+            val_data,
+            val_labels,
+            num_boost_round=1500,
+            early_stopping_rounds=150,
+            N=N,
+        )
