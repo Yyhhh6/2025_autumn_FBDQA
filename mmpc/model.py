@@ -62,15 +62,16 @@ class XGBModel:
         early_stopping_rounds: int = 50,
         seed: int = 42,
         N: int = 0,
-        weight1: float=2.0,
+        weight1: float=1.0,
         weight2: float=0.3,
-        weight3: float=2.0,
+        weight3: float=1.0,
         max_depth: int = 3,
         subsample: float = 0.5,
         colsample_bytree: float = 0.48,
         min_child_weight: int = 18,
         gamma: float = 4.3,
         save_path: str = "./models/",
+        sym: str = "all",
     ):
         """
         Train XGBoost from scratch
@@ -117,7 +118,7 @@ class XGBModel:
 
         # 生成时间戳
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(save_path, f"model_{N}_{timestamp}.json")
+        filename = os.path.join(save_path, f"model_{N}_{sym}_{timestamp}.json")
         self.model.save_model(filename)
         print(f"Model for N={N} trained and saved.")
 

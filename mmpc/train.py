@@ -212,6 +212,7 @@ if __name__ == "__main__":
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
     parser.add_argument("--file_dir", type=str, default="./data/data_sym0", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models/", help="save_path")
 
     args = parser.parse_args()
 
@@ -227,6 +228,7 @@ if __name__ == "__main__":
     print(f"min_child_weight: {args.min_child_weight}")
     print(f"gamma: {args.gamma}")
     print(f"file_dir: {args.file_dir}")
+    print(f"save_path: {args.save_path}")
     print("===============================")
 
     for N in N_list:
@@ -246,6 +248,16 @@ if __name__ == "__main__":
             num_boost_round=args.num_boost_round,
             early_stopping_rounds=150,
             N=N,
+            weight1=args.weight1,
+            weight2=args.weight2,
+            weight3=args.weight3,
+            max_depth=args.max_depth,
+            subsample=args.subsample,
+            colsample_bytree=args.colsample_bytree,
+            min_child_weight=args.min_child_weight,
+            gamma=args.gamma,
+            save_path=args.save_path,
+            # sym: str = "all",
         )
 
         print("*"*50)
