@@ -192,6 +192,10 @@ for N in N_list:
             win_rate = (trade_pnl > 0).mean() if len(trade_pnl) > 0 else 0
             num_trades = len(trade_pnl)
 
+            final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
+            if avg_pnl - 0.0006 < 0:
+                final_score = -final_score
+
             overall_metrics.append({
                 "sym": sym,
                 "target_confidence": target_confidence,
@@ -201,7 +205,8 @@ for N in N_list:
                 "Total_PNL": total_pnl,
                 "Avg_PNL": avg_pnl,
                 "Win_Rate": win_rate,
-                "Num_Trades": num_trades
+                "Num_Trades": num_trades,
+                "Final_Score": final_score, 
             })
 
     for target_confidence in target_confidences:
@@ -228,6 +233,10 @@ for N in N_list:
         win_rate = (trade_pnl > 0).mean() if len(trade_pnl) > 0 else 0
         num_trades = len(trade_pnl)
 
+        final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
+        if avg_pnl - 0.0006 < 0:
+            final_score = -final_score
+
         overall_metrics.append({
             "sym": "Overall",
             "target_confidence": target_confidence,
@@ -237,7 +246,8 @@ for N in N_list:
             "Total_PNL": total_pnl,
             "Avg_PNL": avg_pnl,
             "Win_Rate": win_rate,
-            "Num_Trades": num_trades
+            "Num_Trades": num_trades,
+            "Final_Score": final_score, 
         })
 
     # ------------------ 输出指标 ------------------

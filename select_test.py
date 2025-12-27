@@ -5,7 +5,7 @@ import shutil
 # 原始数据文件夹前缀
 source_prefix = "./data/data_sym"
 num_syms = 10
-num_samples_per_sym = 5
+num_samples_per_sym = 15
 
 # 目标文件夹
 target_dir = "./data/data_test"

@@ -9,8 +9,11 @@ from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, log_loss, mean_squared_log_error
 from tqdm import tqdm
 
+from collections import defaultdict
+
 # 去掉涨跌停的文件
 # EXCLUDE_FILES = ['./data/data_raw/snapshot_sym1_date33_pm.csv', './data/data_raw/snapshot_sym7_date42_am.csv', './data/data_raw/snapshot_sym1_date25_am.csv', './data/data_raw/snapshot_sym6_date32_pm.csv', './data/data_raw/snapshot_sym4_date33_pm.csv', './data/data_raw/snapshot_sym2_date59_pm.csv', './data/data_raw/snapshot_sym1_date26_pm.csv', './data/data_raw/snapshot_sym2_date59_am.csv', './data/data_raw/snapshot_sym2_date57_pm.csv', './data/data_raw/snapshot_sym4_date34_am.csv', './data/data_raw/snapshot_sym5_date38_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym1_date33_am.csv', './data/data_raw/snapshot_sym1_date34_pm.csv', './data/data_raw/snapshot_sym0_date63_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym7_date10_pm.csv', './data/data_raw/snapshot_sym4_date32_pm.csv', './data/data_raw/snapshot_sym6_date42_pm.csv', './data/data_raw/snapshot_sym4_date33_am.csv', './data/data_raw/snapshot_sym7_date42_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv', './data/data_raw/snapshot_sym2_date42_pm.csv', './data/data_raw/snapshot_sym4_date34_pm.csv', './data/data_raw/snapshot_sym1_date25_pm.csv', './data/data_raw/snapshot_sym5_date23_pm.csv', './data/data_raw/snapshot_sym6_date33_pm.csv', './data/data_raw/snapshot_sym4_date31_pm.csv', './data/data_raw/snapshot_sym7_date10_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv',]
+EXCLUDE_FILES = []
 
 TRAIN_RATIO = 0.8
 VAL_RATIO = 0.1 
@@ -117,80 +120,141 @@ def extract_feature_test(files_dir, N):
     return data, labels_list, midprice_list
 
 def group_files_by_sym(file_list):
-    sym2files = {}
+    """
+    使用字符串切分方法按 sym 分类文件
+    返回 defaultdict(list)
+    """
+    sym_dict = defaultdict(list)
     for f in file_list:
-        # 假设文件名里有 snapshot_symX_
+        # 假设文件名中有 snapshot_symX_，提取 symX
         basename = os.path.basename(f)
-        sym = basename.split("snapshot_")[1].split("_")[0]  # sym0, sym1 ...
-        if sym not in sym2files:
-            sym2files[sym] = []
-        sym2files[sym].append(f)
-    return sym2files
+        print("basename: ", basename)
+        sym = basename.split("snapshot_")[1].split("_")[0]  # e.g., sym0, sym1
+        sym_dict[sym].append(f)
+    return sym_dict
 
 def test_by_sym_function(test_files, N, models):
-    test_by_sym = group_files_by_sym(test_files)
+    sym_files_dict = group_files_by_sym(test_files)
+    overall_metrics = []
 
-    for sym, files in test_by_sym.items():
-        print(f"\n===== Testing {sym} =====")
-        model = models[sym]
-
-        test_data, test_labels, n_midprice = extract_feature_test(files, N)
-        print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
+    for sym, sym_files in sym_files_dict.items():
+        model_path = models.get(sym)
+        if not model_path:
+            print(f"No model found for sym{sym}, skipping.")
+            continue
+        print(f"Evaluating sym{sym} with {len(sym_files)} files using model {model_path}")
+        test_data, test_labels, n_midprice = extract_feature_test(sym_files, N)
+        model = XGBModel(model_path)
         y_pred = model.predict(test_data)
 
-    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+        target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
+        _all_y = {}
+        _all_labels = {}
+        _all_pnl = {}
+        for target_confidence in target_confidences:
+            _all_y[target_confidence] = []
+            _all_labels[target_confidence] = []
+            _all_pnl[target_confidence] = []
+
+            confidence = np.max(y_pred, axis=1)
+            signal = np.argmax(y_pred, axis=1)
+            signal[confidence < target_confidence] = 1  # Hold
+
+            # 拼接所有 sym
+            _all_y[target_confidence].append(signal)
+            _all_labels[target_confidence].append(test_labels)
+
+            y = signal
+            index_recall = test_labels != 1
+            recall = sum(y[index_recall] == test_labels[index_recall]) / sum(index_recall)
+            index_precision = y != 1
+            precision = sum(y[index_precision] == test_labels[index_precision]) / sum(index_precision)
+            beta = 0.5
+            f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
+
+            pnl = []
+            for i, s in enumerate(signal):
+                if i + N >= len(n_midprice):
+                    continue
+                if s == 2:
+                    pnl.append(n_midprice[i+N] - n_midprice[i])
+                elif s == 0:
+                    pnl.append(n_midprice[i] - n_midprice[i+N])
+            _all_pnl[target_confidence].append(np.array(pnl))
+
+            pnl = np.array(pnl)
+            total_pnl = pnl.sum()
+            avg_pnl = pnl.mean()
+            trade_pnl = pnl[pnl != 0]
+            win_rate = (trade_pnl > 0).mean() if len(trade_pnl) > 0 else 0
+            num_trades = len(trade_pnl)
+
+            final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
+            if avg_pnl - 0.0006 < 0:
+                final_score = -final_score
+
+            overall_metrics.append({
+                "sym": sym,
+                "target_confidence": target_confidence,
+                "Precision": precision,
+                "Recall": recall,
+                "F0.5": f05,
+                "Total_PNL": total_pnl,
+                "Avg_PNL": avg_pnl,
+                "Win_Rate": win_rate,
+                "Num_Trades": num_trades,
+                "Final_Score": final_score, 
+            })
+
     for target_confidence in target_confidences:
-        print(f"************target_confidence={target_confidence}************")
-        confidence = np.max(y_pred, axis=1)
-        signal = np.argmax(y_pred, axis=1)
-        signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
-        y = signal
-        print(f"y shape: {y.shape}, test_labels shape: {test_labels.shape}")
-        from sklearn.metrics import classification_report, precision_score, recall_score, fbeta_score
-        print(f"Results for N={N}:")
-        # print(classification_report(test_labels, y, digits=4))
-        # Recall：真实上涨/下跌中，被预测正确的比例
-        index_recall = test_labels != 1
-        print("index_recall: ", index_recall)
-        recall = sum(y[index_recall] == test_labels[index_recall]) / sum(index_recall)
-        # Precision：预测上涨/下跌中，预测正确的比例
-        index_precision = y != 1
-        precision = sum(y[index_precision] == test_labels[index_precision]) / sum(index_precision)
+        all_y = _all_y[target_confidence]
+        all_labels = _all_labels[target_confidence]
+        all_pnl = _all_pnl[target_confidence]
+
+        # 合并所有 sym 数据
+        all_y = np.concatenate(all_y)
+        all_labels = np.concatenate(all_labels)
+        all_pnl = np.concatenate(all_pnl)
+
+        # 总体指标计算
+        index_recall = all_labels != 1
+        recall = sum(all_y[index_recall] == all_labels[index_recall]) / sum(index_recall)
+        index_precision = all_y != 1
+        precision = sum(all_y[index_precision] == all_labels[index_precision]) / sum(index_precision)
         beta = 0.5
         f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
-        print(f"Precision: {precision:.4f}")
-        print(f"Recall:    {recall:.4f}")
-        print(f"F0.5:      {f05:.4f}")
-        pnl = []
 
-        for i, s in enumerate(signal):
-            if i + N >= len(n_midprice):
-                # pnl.append(0)
-                continue
-            if s == 2:      # Long
-                pnl.append(n_midprice[i+N] - n_midprice[i])
-            elif s == 0:    # Short
-                pnl.append(n_midprice[i] - n_midprice[i+N])
-            # else:           # Hold
-            #     pnl.append(0)
-
-        pnl = np.array(pnl)
-        total_pnl = pnl.sum()
-        avg_pnl = pnl.mean()
-        trade_pnl = pnl[pnl != 0]
-
-        win_rate = (trade_pnl > 0).mean()
+        total_pnl = all_pnl.sum()
+        avg_pnl = all_pnl.mean()
+        trade_pnl = all_pnl[all_pnl != 0]
+        win_rate = (trade_pnl > 0).mean() if len(trade_pnl) > 0 else 0
         num_trades = len(trade_pnl)
 
         final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
         if avg_pnl - 0.0006 < 0:
             final_score = -final_score
 
-        print(f"Total PNL:   {total_pnl:.4f}")
-        print(f"Avg PNL:     {avg_pnl:.6f}")
-        print(f"Trades:      {num_trades}")
-        print(f"Win Rate:    {win_rate:.3f}")
-        print(f"Final Score:    {final_score:.3f}")
+        overall_metrics.append({
+            "sym": "Overall",
+            "target_confidence": target_confidence,
+            "Precision": precision,
+            "Recall": recall,
+            "F0.5": f05,
+            "Total_PNL": total_pnl,
+            "Avg_PNL": avg_pnl,
+            "Win_Rate": win_rate,
+            "Num_Trades": num_trades,
+            "Final_Score": final_score, 
+        })
+
+    # ------------------ 输出指标 ------------------
+    df_metrics = pd.DataFrame(overall_metrics)
+    print("Per-sym metrics:\n", df_metrics)
+
+    # 保存到 CSV 文件
+    output_file = "./results/per_sym_metrics.csv"
+    df_metrics.to_csv(output_file, index=False)  # 不保存行索引
+    print(f"Per-sym metrics saved to {output_file}")
 
 if __name__ == "__main__":
     import argparse
@@ -233,7 +297,6 @@ if __name__ == "__main__":
         # 提取训练集、验证集、测试集的特征
         train_by_sym = group_files_by_sym(train_files)
         val_by_sym   = group_files_by_sym(val_files)
-        test_by_sym  = group_files_by_sym(test_files)
 
         models = {}
 
@@ -271,6 +334,6 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        test_by_sym_function(test_by_sym, N=N, models=models)
+        test_by_sym_function(test_files, N=N, models=models)
     
     print("\n\n\n")
