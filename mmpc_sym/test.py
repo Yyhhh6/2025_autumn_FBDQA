@@ -151,21 +151,21 @@ for N in N_list:
         y_pred = model.predict(test_data)
 
         target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
-        all_y = {}
-        all_labels = {}
-        all_pnl = {}
+        _all_y = {}
+        _all_labels = {}
+        _all_pnl = {}
         for target_confidence in target_confidences:
-            all_y[target_confidence] = []
-            all_labels[target_confidence] = []
-            all_pnl[target_confidence] = []
+            _all_y[target_confidence] = []
+            _all_labels[target_confidence] = []
+            _all_pnl[target_confidence] = []
 
             confidence = np.max(y_pred, axis=1)
             signal = np.argmax(y_pred, axis=1)
             signal[confidence < target_confidence] = 1  # Hold
 
             # 拼接所有 sym
-            all_y[target_confidence].append(signal)
-            all_labels[target_confidence].append(test_labels)
+            _all_y[target_confidence].append(signal)
+            _all_labels[target_confidence].append(test_labels)
 
             y = signal
             index_recall = test_labels != 1
@@ -183,7 +183,7 @@ for N in N_list:
                     pnl.append(n_midprice[i+N] - n_midprice[i])
                 elif s == 0:
                     pnl.append(n_midprice[i] - n_midprice[i+N])
-            all_pnl[target_confidence].append(np.array(pnl))
+            _all_pnl[target_confidence].append(np.array(pnl))
 
             pnl = np.array(pnl)
             total_pnl = pnl.sum()
@@ -205,9 +205,9 @@ for N in N_list:
             })
 
     for target_confidence in target_confidences:
-        all_y = all_y[target_confidence]
-        all_labels = all_labels[target_confidence]
-        all_pnl = all_pnl[target_confidence]
+        all_y = _all_y[target_confidence]
+        all_labels = _all_labels[target_confidence]
+        all_pnl = _all_pnl[target_confidence]
 
         # 合并所有 sym 数据
         all_y = np.concatenate(all_y)
