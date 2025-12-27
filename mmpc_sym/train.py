@@ -252,7 +252,8 @@ def test_by_sym_function(test_files, N, models):
     print("Per-sym metrics:\n", df_metrics)
 
     # 保存到 CSV 文件
-    output_file = "./results/per_sym_metrics.csv"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = f"./results/per_sym_metrics_{timestamp}.csv"
     df_metrics.to_csv(output_file, index=False)  # 不保存行索引
     print(f"Per-sym metrics saved to {output_file}")
 
