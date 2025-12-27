@@ -20,7 +20,7 @@ SEED = 42
 # N_list = [5, 10, 20, 40, 60]
 N_list = [20]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
-file_dir="./data/data_sym"
+file_dir="./data/data_raw"
 
 def split_csv_files(
     data_dir,
@@ -91,11 +91,12 @@ for N in N_list:
     train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
     test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=N)
     print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
-    model = XGBModel("mmpc/model_20.json")
+    model = XGBModel("mmpc/model_20_20251226_205657.json")
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
     y_pred = model.predict(test_data)   # (N, 3)
 
-    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    # target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    target_confidences = [0.7, 0.73, 0.75, 0.78, 0.8, 0.83, 0.85, 0.88, 0.9]
 
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
@@ -140,8 +141,13 @@ for N in N_list:
         win_rate = (trade_pnl > 0).mean()
         num_trades = len(trade_pnl)
 
+        final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
+        if avg_pnl - 0.0006 < 0:
+            final_score = -final_score
+
         print(f"Total PNL:   {total_pnl:.4f}")
         print(f"Avg PNL:     {avg_pnl:.6f}")
         print(f"Trades:      {num_trades}")
         print(f"Win Rate:    {win_rate:.3f}")
+        print(f"Final Score:    {final_score:.3f}")
     
