@@ -127,7 +127,7 @@ def group_files_by_sym(file_list):
         sym2files[sym].append(f)
     return sym2files
 
-def test_by_sym(test_files, N, models):
+def test_by_sym_function(test_files, N, models):
     test_by_sym = group_files_by_sym(test_files)
 
     for sym, files in test_by_sym.items():
@@ -182,10 +182,15 @@ def test_by_sym(test_files, N, models):
         win_rate = (trade_pnl > 0).mean()
         num_trades = len(trade_pnl)
 
+        final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
+        if avg_pnl - 0.0006 < 0:
+            final_score = -final_score
+
         print(f"Total PNL:   {total_pnl:.4f}")
         print(f"Avg PNL:     {avg_pnl:.6f}")
         print(f"Trades:      {num_trades}")
         print(f"Win Rate:    {win_rate:.3f}")
+        print(f"Final Score:    {final_score:.3f}")
 
 if __name__ == "__main__":
     import argparse
@@ -202,7 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
     parser.add_argument("--file_dir", type=str, default="./data/data_sym0", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models/", help="save_path")
+    parser.add_argument("--save_path", type=str, default="./models_sym/", help="save_path")
 
     args = parser.parse_args()
 
@@ -248,6 +253,14 @@ if __name__ == "__main__":
                 num_boost_round=args.num_boost_round,
                 early_stopping_rounds=150,
                 N=N,
+                weight1=args.weight1,
+                weight2=args.weight2,
+                weight3=args.weight3,
+                max_depth=args.max_depth,
+                subsample=args.subsample,
+                colsample_bytree=args.colsample_bytree,
+                min_child_weight=args.min_child_weight,
+                gamma=args.gamma,
                 save_path=args.save_path,
                 sym=sym,
             )
@@ -257,6 +270,6 @@ if __name__ == "__main__":
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
-        test_by_sym(test_files, N=N, model=model)
+        test_by_sym_function(test_by_sym, N=N, model=model)
     
     print("\n\n\n")

@@ -85,3 +85,5 @@ docker-compose.override.yml
 mmpc/model_20.json
 
 qyh.zip
+
+*.json

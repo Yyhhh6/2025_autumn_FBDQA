@@ -192,10 +192,15 @@ def test(test_files, N, model):
         win_rate = (trade_pnl > 0).mean()
         num_trades = len(trade_pnl)
 
+        final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
+        if avg_pnl - 0.0006 < 0:
+            final_score = -final_score
+
         print(f"Total PNL:   {total_pnl:.4f}")
         print(f"Avg PNL:     {avg_pnl:.6f}")
         print(f"Trades:      {num_trades}")
         print(f"Win Rate:    {win_rate:.3f}")
+        print(f"Final Score:    {final_score:.3f}")
 
 if __name__ == "__main__":
     import argparse

@@ -96,7 +96,7 @@ for N in N_list:
     y_pred = model.predict(test_data)   # (N, 3)
 
     # target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
-    target_confidences = [0.7, 0.73, 0.75, 0.78, 0.8, 0.83, 0.85, 0.88, 0.9]
+    target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
 
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
