@@ -128,7 +128,7 @@ def group_files_by_sym(file_list):
     for f in file_list:
         # 假设文件名中有 snapshot_symX_，提取 symX
         basename = os.path.basename(f)
-        print("basename: ", basename)
+        # print("basename: ", basename)
         sym = basename.split("snapshot_")[1].split("_")[0]  # e.g., sym0, sym1
         sym_dict[sym].append(f)
     return sym_dict
@@ -138,13 +138,13 @@ def test_by_sym_function(test_files, N, models):
     overall_metrics = []
 
     for sym, sym_files in sym_files_dict.items():
-        model_path = models.get(sym)
-        if not model_path:
-            print(f"No model found for sym{sym}, skipping.")
-            continue
-        print(f"Evaluating sym{sym} with {len(sym_files)} files using model {model_path}")
+        model = models.get(sym)
+        # if not model_path:
+        #     print(f"No model found for sym{sym}, skipping.")
+        #     continue
+        print(f"Evaluating sym{sym} with {len(sym_files)} files using model_{sym}")
         test_data, test_labels, n_midprice = extract_feature_test(sym_files, N)
-        model = XGBModel(model_path)
+        # model = XGBModel(model_path)
         y_pred = model.predict(test_data)
 
         target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
