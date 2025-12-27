@@ -49,61 +49,82 @@ def split_csv_files(data_dir, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1, se
     print(f"Total CSV files: {n}, Train: {len(train_files)}, Val: {len(val_files)}, Test: {len(test_files)}")
     return train_files, val_files, test_files
 
-def extract_feature(files_list, N):
+def extract_feature_test(files_dir, N):
+    csv_files = files_dir
     def process_file(file, N):
-        if not os.path.exists(file):
+        if os.path.exists(file):
+            df = pd.read_csv(file)#[:-N]
+            n_midprice = df['n_midprice'].values
+            if df.empty:
+                raise ValueError(f"File {file} is empty.")
+            df = df.reset_index(drop=True)
+            df, labels = preprocess(df, N)
+            df = df.squeeze(axis=0)
+            labels = labels[99:]
+            df_list = df[99:]
+            n_midprice = n_midprice[99:]
+        else:
+            print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
-        df = pd.read_csv(file)
-        if df.empty:
-            raise ValueError(f"File {file} is empty.")
-        df = df.reset_index(drop=True)
-        df, labels = preprocess(df, N)
-        df = df.squeeze(axis=0)
-        labels = labels[99:]
-        df_list = df[99:]
-        n_midprice = df['n_midprice'].values[99:]
         return df_list, labels, n_midprice
 
-    data, labels_list, midprice_list = [], [], []
-    for file in tqdm(files_list, total=len(files_list), desc="Extracting features"):
+    data = []
+    labels_list = []
+    midprice_list = []
+
+    for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
         df, labels, n_midprice = process_file(file, N)
         data.append(df)
         labels_list.append(labels)
         midprice_list.append(n_midprice)
-
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
     midprice_list = np.concatenate(midprice_list, axis=0)
+
     return data, labels_list, midprice_list
 
 # ------------------ 按 sym 分组 ------------------
 def group_files_by_sym(file_list):
+    """
+    使用字符串切分方法按 sym 分类文件
+    返回 defaultdict(list)
+    """
     sym_dict = defaultdict(list)
-    for file in file_list:
-        match = re.search(r'sym(\d+)', file)
-        if match:
-            sym = int(match.group(1))
-            sym_dict[sym].append(file)
+    for f in file_list:
+        # 假设文件名中有 snapshot_symX_，提取 symX
+        basename = os.path.basename(f)
+        sym = basename.split("snapshot_")[1].split("_")[0]  # e.g., sym0, sym1
+        sym_dict[sym].append(f)
     return sym_dict
 
 # ------------------ 模型按 sym 分类 ------------------
 def get_model_files_by_sym(model_dir):
+    """
+    扫描模型文件夹，将模型按 sym 分类，返回 { 'sym0': latest_model_path, ... }
+    """
     model_files = [f for f in os.listdir(model_dir) if f.endswith(".json")]
     sym_model_dict = defaultdict(list)
+
     for f in model_files:
-        match = re.search(r'sym(\d+)', f)
-        if match:
-            sym = int(match.group(1))
-            sym_model_dict[sym].append(os.path.join(model_dir, f))
+        # 假设模型名里有 symX
+        basename = os.path.basename(f)
+        parts = basename.split("sym")
+        if len(parts) < 2:
+            continue  # 文件名中没有 symX
+        sym_str = "sym" + parts[1].split("_")[0]  # 得到 sym0, sym1 ...
+        sym_model_dict[sym_str].append(os.path.join(model_dir, f))
+
     # 取每个 sym 的最新模型（按文件名排序）
     for sym in sym_model_dict:
         sym_model_dict[sym].sort()
         sym_model_dict[sym] = sym_model_dict[sym][-1]
+
     return sym_model_dict
 
 # ------------------ 主评测流程 ------------------
 overall_metrics = []
 sym_model_dict = get_model_files_by_sym(model_dir)
+# print("sym_model_dict: ", sym_model_dict)
 
 for N in N_list:
     train_files, val_files, test_files = split_csv_files(
@@ -115,6 +136,7 @@ for N in N_list:
     )
 
     sym_files_dict = group_files_by_sym(test_files)
+    # print("sym_files_dict: ", sym_files_dict)
 
     for sym, sym_files in sym_files_dict.items():
         model_path = sym_model_dict.get(sym)
@@ -122,7 +144,7 @@ for N in N_list:
             print(f"No model found for sym{sym}, skipping.")
             continue
         print(f"Evaluating sym{sym} with {len(sym_files)} files using model {model_path}")
-        test_data, test_labels, n_midprice = extract_feature(sym_files, N)
+        test_data, test_labels, n_midprice = extract_feature_test(sym_files, N)
         model = XGBModel(model_path)
         y_pred = model.predict(test_data)
 
