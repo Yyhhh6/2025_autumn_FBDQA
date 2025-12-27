@@ -10,8 +10,7 @@ from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, log_loss, m
 from tqdm import tqdm
 
 # 去掉涨跌停的文件
-# EXCLUDE_FILES = ['./data/data_raw/snapshot_sym1_date33_pm.csv', './data/data_raw/snapshot_sym7_date42_am.csv', './data/data_raw/snapshot_sym1_date25_am.csv', './data/data_raw/snapshot_sym6_date32_pm.csv', './data/data_raw/snapshot_sym4_date33_pm.csv', './data/data_raw/snapshot_sym2_date59_pm.csv', './data/data_raw/snapshot_sym1_date26_pm.csv', './data/data_raw/snapshot_sym2_date59_am.csv', './data/data_raw/snapshot_sym2_date57_pm.csv', './data/data_raw/snapshot_sym4_date34_am.csv', './data/data_raw/snapshot_sym5_date38_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym1_date33_am.csv', './data/data_raw/snapshot_sym1_date34_pm.csv', './data/data_raw/snapshot_sym0_date63_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym7_date10_pm.csv', './data/data_raw/snapshot_sym4_date32_pm.csv', './data/data_raw/snapshot_sym6_date42_pm.csv', './data/data_raw/snapshot_sym4_date33_am.csv', './data/data_raw/snapshot_sym7_date42_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv', './data/data_raw/snapshot_sym2_date42_pm.csv', './data/data_raw/snapshot_sym4_date34_pm.csv', './data/data_raw/snapshot_sym1_date25_pm.csv', './data/data_raw/snapshot_sym5_date23_pm.csv', './data/data_raw/snapshot_sym6_date33_pm.csv', './data/data_raw/snapshot_sym4_date31_pm.csv', './data/data_raw/snapshot_sym7_date10_am.csv']
-EXCLUDE_FILES = ['./data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv',]
+EXCLUDE_FILES = ['./data/data_raw/snapshot_sym1_date33_pm.csv', './data/data_raw/snapshot_sym7_date42_am.csv', './data/data_raw/snapshot_sym1_date25_am.csv', './data/data_raw/snapshot_sym6_date32_pm.csv', './data/data_raw/snapshot_sym4_date33_pm.csv', './data/data_raw/snapshot_sym2_date59_pm.csv', './data/data_raw/snapshot_sym1_date26_pm.csv', './data/data_raw/snapshot_sym2_date59_am.csv', './data/data_raw/snapshot_sym2_date57_pm.csv', './data/data_raw/snapshot_sym4_date34_am.csv', './data/data_raw/snapshot_sym5_date38_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym1_date33_am.csv', './data/data_raw/snapshot_sym1_date34_pm.csv', './data/data_raw/snapshot_sym0_date63_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym7_date10_pm.csv', './data/data_raw/snapshot_sym4_date32_pm.csv', './data/data_raw/snapshot_sym6_date42_pm.csv', './data/data_raw/snapshot_sym4_date33_am.csv', './data/data_raw/snapshot_sym7_date42_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv', './data/data_raw/snapshot_sym2_date42_pm.csv', './data/data_raw/snapshot_sym4_date34_pm.csv', './data/data_raw/snapshot_sym1_date25_pm.csv', './data/data_raw/snapshot_sym5_date23_pm.csv', './data/data_raw/snapshot_sym6_date33_pm.csv', './data/data_raw/snapshot_sym4_date31_pm.csv', './data/data_raw/snapshot_sym7_date10_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv',]
 
 TRAIN_RATIO = 0.8
 VAL_RATIO = 0.1 
@@ -20,7 +19,6 @@ SEED = 42
 # N_list = [5, 10, 20, 40, 60]
 N_list = [20]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
-file_dir="./data/data_sym"
 
 def split_csv_files(
     data_dir,
@@ -150,7 +148,7 @@ def test(test_files, N, model):
     # model = XGBModel("mmpc/model_20.json")
     y_pred = model.predict(test_data)   # (N, 3)
 
-    target_confidences = [0.6, 0.65, 0.7, 0.75, 0.8, 0.85]
+    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
         confidence = np.max(y_pred, axis=1)
@@ -200,12 +198,40 @@ def test(test_files, N, model):
         print(f"Win Rate:    {win_rate:.3f}")
 
 if __name__ == "__main__":
-    # process_file(file='./data/data_raw/snapshot_sym1_date33_pm.csv', N=10)
-    # exit(0)
+    import argparse
+    parser = argparse.ArgumentParser(description="Train and test XGBModel")
+    parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
+    parser.add_argument("--weight1", type=float, default=1.0, help="Weight 1 for custom loss")
+    parser.add_argument("--weight2", type=float, default=0.5, help="Weight 2 for custom loss")
+    parser.add_argument("--weight3", type=float, default=1.0, help="Weight 3 for custom loss")
+
+    parser.add_argument("--max_depth", type=int, default=3, help="Maximum depth of trees")
+    parser.add_argument("--subsample", type=float, default=0.5, help="Subsample ratio of training instances")
+    parser.add_argument("--colsample_bytree", type=float, default=0.48, help="Subsample ratio of columns per tree")
+    parser.add_argument("--min_child_weight", type=int, default=18, help="Minimum sum of instance weight in a child")
+    parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
+    
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym0", help="file_dir")
+
+    args = parser.parse_args()
+
+    # 打印参数
+    print("===== Training Parameters =====")
+    print(f"num_boost_round: {args.num_boost_round}")
+    print(f"weight1: {args.weight1}")
+    print(f"weight2: {args.weight2}")
+    print(f"weight3: {args.weight3}")
+    print(f"max_depth: {args.max_depth}")
+    print(f"subsample: {args.subsample}")
+    print(f"colsample_bytree: {args.colsample_bytree}")
+    print(f"min_child_weight: {args.min_child_weight}")
+    print(f"gamma: {args.gamma}")
+    print(f"file_dir: {args.file_dir}")
+    print("===============================")
 
     for N in N_list:
         # 划分训练集、验证集、测试集
-        train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+        train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
         # 提取训练集、验证集、测试集的特征
         train_data, train_labels = extract_feature(files_dir=train_files, N=N)
@@ -217,7 +243,7 @@ if __name__ == "__main__":
             train_labels,
             val_data,
             val_labels,
-            num_boost_round=8000,
+            num_boost_round=args.num_boost_round,
             early_stopping_rounds=150,
             N=N,
         )
@@ -226,3 +252,5 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
         test(test_files, N=N, model=model)
+    
+    print("\n\n\n")

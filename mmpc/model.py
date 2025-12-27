@@ -1,8 +1,10 @@
 import xgboost as xgb
 import numpy as np
 from typing import Optional
+import os
+from datetime import datetime
 
-def pnl_weighted_softmax_obj(preds, dtrain):
+def pnl_weighted_softmax_obj(preds, dtrain, weight1=2.0, weight2=0.3, weight3=2.0):
     """
     preds: raw margin, shape (N * K,)
     y: label in {0,1,2}
@@ -22,7 +24,7 @@ def pnl_weighted_softmax_obj(preds, dtrain):
 
     # ===== 核心：方向权重 =====
     # 下跌(0) / 上涨(2) 权重大，中性(1) 小
-    class_weight = np.array([2.0, 0.3, 2.0])
+    class_weight = np.array([weight1, weight2, weight3])
     grad *= class_weight[y][:, None]
 
     # Hessian（近似）
@@ -31,6 +33,11 @@ def pnl_weighted_softmax_obj(preds, dtrain):
 
     return grad.reshape(-1), hess.reshape(-1)
 
+# 定义一个包装函数，把权重固定
+def make_weighted_softmax_obj(weight1, weight2, weight3):
+    def weighted_softmax_obj(preds, dtrain):
+        return pnl_weighted_softmax_obj(preds, dtrain, weight1=weight1, weight2=weight2, weight3=weight3)
+    return weighted_softmax_obj
 
 class XGBModel:
     """
@@ -55,6 +62,15 @@ class XGBModel:
         early_stopping_rounds: int = 50,
         seed: int = 42,
         N: int = 0,
+        weight1: float=2.0,
+        weight2: float=0.3,
+        weight3: float=2.0,
+        max_depth: int = 3,
+        subsample: float = 0.5,
+        colsample_bytree: float = 0.48,
+        min_child_weight: int = 18,
+        gamma: float = 4.3,
+        save_path: str = "./models/",
     ):
         """
         Train XGBoost from scratch
@@ -64,13 +80,13 @@ class XGBModel:
             "objective": "multi:softprob",
             "num_class": 3,
             "eval_metric": ["mlogloss", "auc", "merror"],
-            "max_depth": 4,   # 3 → 4
+            "max_depth": max_depth,   # 3 → 4
             "eta": 0.02,
-            "subsample": 0.5,   # 0.5 → 0.6
-            "colsample_bytree": 0.48,   # 0.48 → 0.35 / 0.4
-            "min_child_weight": 12,   # 18 → 10 / 12
+            "subsample": subsample,   # 0.5 → 0.6
+            "colsample_bytree": colsample_bytree,   # 0.48 → 0.35 / 0.4
+            "min_child_weight": min_child_weight,   # 18 → 10 / 12
             "max_delta_step": 1,
-            "gamma": 4.3,    # 4.3 → 2.0 / 3.0
+            "gamma": gamma,    # 4.3 → 2.0 / 3.0
             "lambda": 7.5,
             "alpha": 0.25,
             "device": "cuda",
@@ -91,12 +107,18 @@ class XGBModel:
             dtrain=dtrain,
             num_boost_round=num_boost_round,
             evals=evals,
-            obj=pnl_weighted_softmax_obj, 
+            obj=make_weighted_softmax_obj(weight1=weight1, weight2=weight2, weight3=weight3), 
             early_stopping_rounds=early_stopping_rounds if len(evals) > 1 else None,
             verbose_eval=50,
         )
 
-        self.model.save_model(f"mmpc/model_{N}.json")
+        # 确保保存目录存在
+        os.makedirs(save_path, exist_ok=True)
+
+        # 生成时间戳
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = os.path.join(save_path, f"model_{N}_{timestamp}.json")
+        self.model.save_model(filename)
         print(f"Model for N={N} trained and saved.")
 
     # =========================
