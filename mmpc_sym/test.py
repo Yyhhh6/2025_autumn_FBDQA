@@ -16,11 +16,13 @@ EXCLUDE_FILES = [
     './data/data_raw/snapshot_sym0_date63_am.csv',
 ]
 
-TRAIN_RATIO = 0.75
+# TRAIN_RATIO = 0.75
+TRAIN_RATIO = 0.0
 VAL_RATIO = 0.0
 SEED = 42
 N_list = [20]
-file_dir = "./data/data_raw"
+# file_dir = "./data/data_raw"
+file_dir = "./data/data_test"
 model_dir = "./models_sym"
 
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
@@ -137,7 +139,7 @@ for N in N_list:
 
     sym_files_dict = group_files_by_sym(test_files)
     # print("sym_files_dict: ", sym_files_dict)
-
+        
     for sym, sym_files in sym_files_dict.items():
         model_path = sym_model_dict.get(sym)
         if not model_path:
@@ -149,11 +151,21 @@ for N in N_list:
         y_pred = model.predict(test_data)
 
         target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
-
+        all_y = {}
+        all_labels = {}
+        all_pnl = {}
         for target_confidence in target_confidences:
+            all_y[target_confidence] = []
+            all_labels[target_confidence] = []
+            all_pnl[target_confidence] = []
+
             confidence = np.max(y_pred, axis=1)
             signal = np.argmax(y_pred, axis=1)
             signal[confidence < target_confidence] = 1  # Hold
+
+            # 拼接所有 sym
+            all_y[target_confidence].append(signal)
+            all_labels[target_confidence].append(test_labels)
 
             y = signal
             index_recall = test_labels != 1
@@ -171,6 +183,7 @@ for N in N_list:
                     pnl.append(n_midprice[i+N] - n_midprice[i])
                 elif s == 0:
                     pnl.append(n_midprice[i] - n_midprice[i+N])
+            all_pnl[target_confidence].append(np.array(pnl))
 
             pnl = np.array(pnl)
             total_pnl = pnl.sum()
@@ -191,9 +204,47 @@ for N in N_list:
                 "Num_Trades": num_trades
             })
 
-# ------------------ 输出指标 ------------------
-df_metrics = pd.DataFrame(overall_metrics)
-print("Per-sym metrics:\n", df_metrics)
+    for target_confidence in target_confidences:
+        all_y = all_y[target_confidence]
+        all_labels = all_labels[target_confidence]
+        all_pnl = all_pnl[target_confidence]
 
-overall_summary = df_metrics.groupby('target_confidence').mean()
-print("\nOverall summary by target_confidence:\n", overall_summary)
+        # 合并所有 sym 数据
+        all_y = np.concatenate(all_y)
+        all_labels = np.concatenate(all_labels)
+        all_pnl = np.concatenate(all_pnl)
+
+        # 总体指标计算
+        index_recall = all_labels != 1
+        recall = sum(all_y[index_recall] == all_labels[index_recall]) / sum(index_recall)
+        index_precision = all_y != 1
+        precision = sum(all_y[index_precision] == all_labels[index_precision]) / sum(index_precision)
+        beta = 0.5
+        f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
+
+        total_pnl = all_pnl.sum()
+        avg_pnl = all_pnl.mean()
+        trade_pnl = all_pnl[all_pnl != 0]
+        win_rate = (trade_pnl > 0).mean() if len(trade_pnl) > 0 else 0
+        num_trades = len(trade_pnl)
+
+        overall_metrics.append({
+            "sym": "Overall",
+            "target_confidence": target_confidence,
+            "Precision": precision,
+            "Recall": recall,
+            "F0.5": f05,
+            "Total_PNL": total_pnl,
+            "Avg_PNL": avg_pnl,
+            "Win_Rate": win_rate,
+            "Num_Trades": num_trades
+        })
+
+    # ------------------ 输出指标 ------------------
+    df_metrics = pd.DataFrame(overall_metrics)
+    print("Per-sym metrics:\n", df_metrics)
+
+    # 保存到 CSV 文件
+    output_file = "./results/per_sym_metrics.csv"
+    df_metrics.to_csv(output_file, index=False)  # 不保存行索引
+    print(f"Per-sym metrics saved to {output_file}")
