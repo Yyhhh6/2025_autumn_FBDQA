@@ -4,7 +4,7 @@ import pandas as pd
 from .Predictor import Predictor  # 确保 Predictor 在包路径中可用
 
 # ================= 配置 =================
-data_dir = "data/data_sym4_test"
+data_dir = "data/data_sym3_test"
 tick_size = 100  # 每 100 个 tick 分一段
 N = 20           # 用于计算 PNL 的步长
 # =======================================
