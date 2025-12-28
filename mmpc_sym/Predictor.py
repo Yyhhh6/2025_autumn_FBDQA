@@ -15,6 +15,7 @@ from .preprocess.preprocess_sym6 import preprocess as preprocess_sym6
 from .preprocess.preprocess_sym7 import preprocess as preprocess_sym7
 from .preprocess.preprocess_sym8 import preprocess as preprocess_sym8
 from .preprocess.preprocess_sym9 import preprocess as preprocess_sym9
+from tqdm import tqdm  # 进度条
 
 class Predictor():
     def __init__(self):
@@ -74,14 +75,14 @@ class Predictor():
         # 对输入数据进行预处理
         print(f"Received {len(x)} dataframes for prediction.")
         y = []
-        for data in x:
+        for data in tqdm(x, desc="Predicting", ncols=80):
             sym = data["sym"].iloc[0]
-            print(f"sym{sym}")
+            # print(f"sym{sym}")
             model = self.models[f"sym{sym}"]
             target_confidence = self.target_confidences[f"sym{sym}"]
 
             data_hat = self.preprocess([data], sym=sym)
-            print("data_hat.shape: ", data_hat.shape)
+            # print("data_hat.shape: ", data_hat.shape)
             # print("target_confidence: ", target_confidence)
 
             y_pred = model.predict(data_hat)   # (N, 3)
@@ -89,9 +90,11 @@ class Predictor():
             signal = np.argmax(y_pred, axis=1)
             signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
             y.append(signal.tolist())
-            y = np.array(y).T.tolist()
-            # 确保返回格式为 List[List[int]]
-            print("y: ", y)
+            # print("y: ", y)
+
+        y = np.array(y).T.tolist()
+        # 确保返回格式为 List[List[int]]
+        # print("y: ", y)
 
         if isinstance(y[0], list):
             return y
