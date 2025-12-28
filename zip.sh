@@ -1,1 +1,1 @@
-zip -r qyh.zip qyh/
+zip -r qyh_sym.zip qyh_sym/

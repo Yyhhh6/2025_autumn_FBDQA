@@ -4,29 +4,72 @@ import pandas as pd
 import numpy as np
 from .model import XGBModel
 from .data_process import assign_tick_time_labels, data_scale_Z_Score
+import re
 
 class Predictor():
     def __init__(self):
-        # 指定模型路径，不使用相对路径
-        # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251227_043202.json')
-        # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
-        self.model = self.load_model(pth_path)
-        print(f"model loaded from {pth_path}")
+        """
+        model_dir: 存放多个 sym 模型的目录
+        """
+        model_dir = "./models"
+        self.models = {}  # key: sym(int), value: model
+
+        for fname in os.listdir(model_dir):
+            if not fname.endswith(".json"):
+                continue
+
+            # 从文件名中提取 sym，例如 sym0 / sym12
+            match = re.search(r"sym(\d+)", fname)
+            if match is None:
+                continue
+
+            sym = int(match.group(1))
+            pth_path = os.path.join(model_dir, fname)
+
+            model = self.load_model(pth_path)
+            self.models[f"sym{sym}"] = model
+
+            print(f"loaded model for sym={sym} from {pth_path}")
+
+        self.target_confidences = {
+            "sym0": 0.725,
+            "sym1": 0.9,
+            "sym2": 0.9,
+            "sym3": 0.725,
+            "sym4": 0.825,
+            "sym5": 0.8,
+            "sym6": 0.75,
+            "sym7": 0.9,
+            "sym8": 0.875,
+            "sym9": 0.9,
+        }
+
+        print("self.models: ",self.models)
+        assert len(self.models) > 0, "未加载到任何 sym 模型"
         
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
         # 对输入数据进行预处理
         print(f"Received {len(x)} dataframes for prediction.")
-        x_hat = self.preprocess(x)
         y = []
-        y_pred = self.model.predict(x_hat)   # (N, 3)
-        confidence = np.max(y_pred, axis=1)
-        signal = np.argmax(y_pred, axis=1)
-        target_confidence = 0.83
-        signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
-        y.append(signal.tolist())
-        y = np.array(y).T.tolist()
-        # 确保返回格式为 List[List[int]]
+        for data in x:
+            sym = data["sym"].iloc[0]
+            print(f"sym{sym}")
+            model = self.models[f"sym{sym}"]
+            target_confidence = self.target_confidences[f"sym{sym}"]
+
+            data_hat = self.preprocess([data])
+            # print("data_hat.shape: ", data_hat.shape)
+            # print("target_confidence: ", target_confidence)
+
+            y_pred = model.predict(data_hat)   # (N, 3)
+            confidence = np.max(y_pred, axis=1)
+            signal = np.argmax(y_pred, axis=1)
+            signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
+            y.append(signal.tolist())
+            y = np.array(y).T.tolist()
+            # 确保返回格式为 List[List[int]]
+            print("y: ", y)
+
         if isinstance(y[0], list):
             return y
         else:

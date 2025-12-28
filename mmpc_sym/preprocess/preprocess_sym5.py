@@ -2,111 +2,50 @@ import os
 from typing import List, Union
 import pandas as pd
 import numpy as np
-from .model import XGBModel
-from .data_process import assign_tick_time_labels, data_scale_Z_Score
 import re
-from .preprocess.preprocess_sym0 import preprocess as preprocess_sym0
-from .preprocess.preprocess_sym1 import preprocess as preprocess_sym1
-from .preprocess.preprocess_sym2 import preprocess as preprocess_sym2
-from .preprocess.preprocess_sym3 import preprocess as preprocess_sym3
-from .preprocess.preprocess_sym4 import preprocess as preprocess_sym4
-from .preprocess.preprocess_sym5 import preprocess as preprocess_sym5
-from .preprocess.preprocess_sym6 import preprocess as preprocess_sym6
-from .preprocess.preprocess_sym7 import preprocess as preprocess_sym7
-from .preprocess.preprocess_sym8 import preprocess as preprocess_sym8
-from .preprocess.preprocess_sym9 import preprocess as preprocess_sym9
+from datetime import datetime, timedelta
 
-class Predictor():
-    def __init__(self):
-        """
-        model_dir: 存放多个 sym 模型的目录
-        """
-        model_dir = "models_sym_c"
-        self.models = {}  # key: sym(int), value: model
-
-        for fname in os.listdir(model_dir):
-            if not fname.endswith(".json"):
-                continue
-
-            # 从文件名中提取 sym，例如 sym0 / sym12
-            match = re.search(r"sym(\d+)", fname)
-            if match is None:
-                continue
-
-            sym = int(match.group(1))
-            pth_path = os.path.join(model_dir, fname)
-
-            model = self.load_model(pth_path)
-            self.models[f"sym{sym}"] = model
-
-            print(f"loaded model for sym={sym} from {pth_path}")
-
-        # print("self.models: ",self.models)
-        assert len(self.models) > 0, "未加载到任何 sym 模型"
-
-        self.target_confidences = {
-            "sym0": 0.8,
-            "sym1": 0.8,
-            "sym2": 0.8,
-            "sym3": 0.8,
-            "sym4": 0.8,
-            "sym5": 0.8,
-            "sym6": 0.8,
-            "sym7": 0.8,
-            "sym8": 0.8,
-            "sym9": 0.8,
-        }
-
-        self.PREPROCESS_MAP = {
-            0: preprocess_sym0,
-            1: preprocess_sym1,
-            2: preprocess_sym2,
-            3: preprocess_sym3,
-            4: preprocess_sym4,
-            5: preprocess_sym5,
-            6: preprocess_sym6,
-            7: preprocess_sym7,
-            8: preprocess_sym8,
-            9: preprocess_sym9,
-        }
-        
-    def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
-        # 对输入数据进行预处理
-        print(f"Received {len(x)} dataframes for prediction.")
-        y = []
-        for data in x:
-            sym = data["sym"].iloc[0]
-            print(f"sym{sym}")
-            model = self.models[f"sym{sym}"]
-            target_confidence = self.target_confidences[f"sym{sym}"]
-
-            data_hat = self.preprocess([data], sym=sym)
-            print("data_hat.shape: ", data_hat.shape)
-            # print("target_confidence: ", target_confidence)
-
-            y_pred = model.predict(data_hat)   # (N, 3)
-            confidence = np.max(y_pred, axis=1)
-            signal = np.argmax(y_pred, axis=1)
-            signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
-            y.append(signal.tolist())
-            y = np.array(y).T.tolist()
-            # 确保返回格式为 List[List[int]]
-            print("y: ", y)
-
-        if isinstance(y[0], list):
-            return y
-        else:
-            return [y]
-        
-    def load_model(self, model_path: str):
-        return XGBModel(model_path)
-
-    def preprocess(self, x: Union[List[pd.DataFrame], pd.DataFrame], sym=-1):
-        if sym == -1:
-            return preprocess(x)
-        else:
-            assert sym in self.PREPROCESS_MAP
-            return self.PREPROCESS_MAP[sym](x)
+def assign_tick_time_labels(tick_series: pd.Series) -> pd.Series:
+    """
+    为tick数据分配时间标签
+    
+    Parameters:
+    tick_series: pd.Series, 格式为 'HH:MM:SS' 的时间字符串
+    
+    Returns:
+    pd.Series: 时间标签，不在范围内的返回NaN
+    """
+    # 创建映射字典
+    tick_series_ = tick_series.copy()
+    time_label_map = {}
+    label_counter = 0
+    
+    # 生成上午时间段 (09:40:03 - 11:19:57)
+    am_start = datetime.strptime('09:40:03', '%H:%M:%S')
+    am_end = datetime.strptime('11:19:57', '%H:%M:%S')
+    
+    current_time = am_start
+    while current_time <= am_end:
+        time_str = current_time.strftime('%H:%M:%S')
+        time_label_map[time_str] = label_counter
+        label_counter += 1
+        current_time += timedelta(seconds=3)
+    
+    # 生成下午时间段 (13:10:03 - 14:49:57)
+    pm_start = datetime.strptime('13:10:03', '%H:%M:%S')
+    pm_end = datetime.strptime('14:49:57', '%H:%M:%S')
+    
+    current_time = pm_start
+    while current_time <= pm_end:
+        time_str = current_time.strftime('%H:%M:%S')
+        time_label_map[time_str] = label_counter
+        label_counter += 1
+        current_time += timedelta(seconds=3)
+    
+    # 使用map函数进行映射
+    labels = tick_series_.map(time_label_map)
+    
+    return labels
 
 def rolling_lr_k_r2(y: np.ndarray):
     if len(y) < 2:
