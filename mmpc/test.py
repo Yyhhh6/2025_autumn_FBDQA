@@ -21,7 +21,7 @@ SEED = 42
 # N_list = [5, 10, 20, 40, 60]
 N_list = [20]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
-file_dir="data/data_sym4_test"
+file_dir="data/data_sym5_test"
 
 def split_csv_files(
     data_dir,
@@ -51,7 +51,7 @@ def split_csv_files(
     val_files = csv_files[n_train:n_train + n_val]
     test_files = csv_files[n_train + n_val:]
     print(f"Total CSV files: {n}, Train: {len(train_files)}, Val: {len(val_files)}, Test: {len(test_files)}")
-
+    print(f"test_files: {test_files}")
     return train_files, val_files, test_files
 
 def extract_feature(files_dir, N):
@@ -90,14 +90,15 @@ def extract_feature(files_dir, N):
 
 for N in N_list:
     train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+    test_files = ['data/data_sym5_test/snapshot_sym5_date56_pm.csv', 'data/data_sym5_test/snapshot_sym5_date9_am.csv', 'data/data_sym5_test/snapshot_sym5_date68_pm.csv', 'data/data_sym5_test/snapshot_sym5_date47_pm.csv', 'data/data_sym5_test/snapshot_sym5_date58_pm.csv', 'data/data_sym5_test/snapshot_sym5_date39_pm.csv', 'data/data_sym5_test/snapshot_sym5_date77_pm.csv', 'data/data_sym5_test/snapshot_sym5_date55_pm.csv', 'data/data_sym5_test/snapshot_sym5_date53_am.csv', 'data/data_sym5_test/snapshot_sym5_date49_am.csv', 'data/data_sym5_test/snapshot_sym5_date10_am.csv', 'data/data_sym5_test/snapshot_sym5_date52_am.csv', 'data/data_sym5_test/snapshot_sym5_date12_pm.csv', 'data/data_sym5_test/snapshot_sym5_date27_pm.csv']
     test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=N)
     print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
-    model = XGBModel("models_sym4/model_20_all_20251228_101413.json")
+    model = XGBModel("/hdd/yyh/src/quant/models_sym5/model_20_all_20251229_002526.json")
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
     y_pred = model.predict(test_data)   # (N, 3)
 
-    # target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
-    target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
+    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    # target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
 
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
@@ -105,6 +106,8 @@ for N in N_list:
         signal = np.argmax(y_pred, axis=1)
         signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
         y = signal
+        # signal = y_pred
+        # y = y_pred
         print(f"y shape: {y.shape}, test_labels shape: {test_labels.shape}")
         from sklearn.metrics import classification_report, precision_score, recall_score, fbeta_score
         print(f"Results for N={N}:")
