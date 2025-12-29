@@ -149,16 +149,21 @@ def test(test_files, N, model):
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
     # model = XGBModel("mmpc/model_20.json")
     y_pred = model.predict(test_data)   # (N, 3)
+    # print("y_pred shape: ", y_pred.shape)
+    # print("y_pred: ", y_pred)
+
     # print("y_pred.shape: ", y_pred.shape)
 
-    # target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
-    target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
+    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    # target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
         signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
         y = signal
+        # signal = y_pred
+        # y = y_pred
         print(f"y shape: {y.shape}, test_labels shape: {test_labels.shape}")
         from sklearn.metrics import classification_report, precision_score, recall_score, fbeta_score
         print(f"Results for N={N}:")
