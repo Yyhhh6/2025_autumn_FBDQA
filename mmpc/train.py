@@ -13,8 +13,8 @@ from tqdm import tqdm
 # EXCLUDE_FILES = ['./data/data_raw/snapshot_sym1_date33_pm.csv', './data/data_raw/snapshot_sym7_date42_am.csv', './data/data_raw/snapshot_sym1_date25_am.csv', './data/data_raw/snapshot_sym6_date32_pm.csv', './data/data_raw/snapshot_sym4_date33_pm.csv', './data/data_raw/snapshot_sym2_date59_pm.csv', './data/data_raw/snapshot_sym1_date26_pm.csv', './data/data_raw/snapshot_sym2_date59_am.csv', './data/data_raw/snapshot_sym2_date57_pm.csv', './data/data_raw/snapshot_sym4_date34_am.csv', './data/data_raw/snapshot_sym5_date38_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym1_date33_am.csv', './data/data_raw/snapshot_sym1_date34_pm.csv', './data/data_raw/snapshot_sym0_date63_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym7_date10_pm.csv', './data/data_raw/snapshot_sym4_date32_pm.csv', './data/data_raw/snapshot_sym6_date42_pm.csv', './data/data_raw/snapshot_sym4_date33_am.csv', './data/data_raw/snapshot_sym7_date42_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv', './data/data_raw/snapshot_sym2_date42_pm.csv', './data/data_raw/snapshot_sym4_date34_pm.csv', './data/data_raw/snapshot_sym1_date25_pm.csv', './data/data_raw/snapshot_sym5_date23_pm.csv', './data/data_raw/snapshot_sym6_date33_pm.csv', './data/data_raw/snapshot_sym4_date31_pm.csv', './data/data_raw/snapshot_sym7_date10_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv',]
 EXCLUDE_FILES = []
 
-TRAIN_RATIO = 0.8
-VAL_RATIO = 0.1 
+TRAIN_RATIO = 0.9
+VAL_RATIO = 0.1
 SEED = 42
 
 # N_list = [5, 10, 20, 40, 60]
@@ -113,7 +113,7 @@ def extract_feature_test(files_dir, N):
         midprice_list.append(n_midprice)
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
-    midprice_list = np.concatenate(midprice_list, axis=0)
+    # midprice_list = np.concatenate(midprice_list, axis=0)
 
     return data, labels_list, midprice_list
 
@@ -144,7 +144,8 @@ def extract_feature_test(files_dir, N):
 
 def test(test_files, N, model):
     test_data, test_labels, n_midprice = extract_feature_test(files_dir=test_files, N=N)
-    print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
+    # print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
+    print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}")
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
     # model = XGBModel("mmpc/model_20.json")
     y_pred = model.predict(test_data)   # (N, 3)
@@ -181,16 +182,34 @@ def test(test_files, N, model):
         print(f"F0.5:      {f05:.4f}")
         pnl = []
 
-        for i, s in enumerate(signal):
-            if i + N >= len(n_midprice):
-                # pnl.append(0)
-                continue
-            if s == 2:      # Long
-                pnl.append(n_midprice[i+N] - n_midprice[i])
-            elif s == 0:    # Short
-                pnl.append(n_midprice[i] - n_midprice[i+N])
-            # else:           # Hold
-            #     pnl.append(0)
+        print("len(n_midprice): ", len(n_midprice))
+
+        start = 0
+        j = 0
+        for i in range(len(n_midprice)):
+            length = len(n_midprice[i])
+            for j in range(length):
+                if j + N >= length:
+                    break
+                if signal[j+start] == 2:      # Long
+                    pnl.append(n_midprice[i][j+N] - n_midprice[i][j])
+                elif signal[j+start] == 0:    # Short
+                    pnl.append(n_midprice[i][j] - n_midprice[i][j+N])
+            start += length
+            
+        print("****************start*******************: ", start)
+        # exit(0)
+
+        # for i, s in enumerate(signal):
+        #     if i + N >= len(n_midprice):
+        #         # pnl.append(0)
+        #         continue
+        #     if s == 2:      # Long
+        #         pnl.append(n_midprice[i+N] - n_midprice[i])
+        #     elif s == 0:    # Short
+        #         pnl.append(n_midprice[i] - n_midprice[i+N])
+        #     # else:           # Hold
+        #     #     pnl.append(0)
 
         pnl = np.array(pnl)
         total_pnl = pnl.sum()
@@ -213,19 +232,19 @@ def test(test_files, N, model):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
-    parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")#1300
-    parser.add_argument("--weight1", type=float, default=1.0, help="Weight 1 for custom loss")
+    parser.add_argument("--num_boost_round", type=int, default=4000, help="Number of boosting rounds")
+    parser.add_argument("--weight1", type=float, default=1.5, help="Weight 1 for custom loss")
     parser.add_argument("--weight2", type=float, default=0.5, help="Weight 2 for custom loss")
-    parser.add_argument("--weight3", type=float, default=1.0, help="Weight 3 for custom loss")
+    parser.add_argument("--weight3", type=float, default=1.5, help="Weight 3 for custom loss")
 
     parser.add_argument("--max_depth", type=int, default=3, help="Maximum depth of trees")
     parser.add_argument("--subsample", type=float, default=0.5, help="Subsample ratio of training instances")
     parser.add_argument("--colsample_bytree", type=float, default=0.48, help="Subsample ratio of columns per tree")
-    parser.add_argument("--min_child_weight", type=int, default=18, help="Minimum sum of instance weight in a child")
+    parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym5_train", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_sym5/", help="save_path")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models_ZZZ/", help="save_path")
 
     args = parser.parse_args()
 
@@ -245,47 +264,47 @@ if __name__ == "__main__":
     print("===============================")
 
     for N in N_list:
-        # 划分训练集、验证集、测试集
-        train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+        # # 划分训练集、验证集、测试集
+        # train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
-        print("train_files: ", train_files)
-        print("val_files: ", val_files)
-        print("test_files: ", test_files)
-        # exit(0)
+        # print("train_files: ", train_files)
+        # print("val_files: ", val_files)
+        # print("test_files: ", test_files)
+        # # exit(0)
 
-        # 提取训练集、验证集、测试集的特征
-        train_data, train_labels = extract_feature(files_dir=train_files, N=N)
-        val_data, val_labels = extract_feature(files_dir=val_files, N=N)
+        # # 提取训练集、验证集、测试集的特征
+        # train_data, train_labels = extract_feature(files_dir=train_files, N=N)
+        # val_data, val_labels = extract_feature(files_dir=val_files, N=N)
 
-        # print("train_data.shape: ", train_data.shape)
+        # # print("train_data.shape: ", train_data.shape)
         
-        model = XGBModel()
-        model.train(
-            train_data,
-            train_labels,
-            val_data,
-            val_labels,
-            num_boost_round=args.num_boost_round,
-            early_stopping_rounds=150,
-            N=N,
-            weight1=args.weight1,
-            weight2=args.weight2,
-            weight3=args.weight3,
-            max_depth=args.max_depth,
-            subsample=args.subsample,
-            colsample_bytree=args.colsample_bytree,
-            min_child_weight=args.min_child_weight,
-            gamma=args.gamma,
-            save_path=args.save_path,
-            # sym: str = "all",
-        )
+        # model = XGBModel()
+        # model.train(
+        #     train_data,
+        #     train_labels,
+        #     val_data,
+        #     val_labels,
+        #     num_boost_round=args.num_boost_round,
+        #     early_stopping_rounds=150,
+        #     N=N,
+        #     weight1=args.weight1,
+        #     weight2=args.weight2,
+        #     weight3=args.weight3,
+        #     max_depth=args.max_depth,
+        #     subsample=args.subsample,
+        #     colsample_bytree=args.colsample_bytree,
+        #     min_child_weight=args.min_child_weight,
+        #     gamma=args.gamma,
+        #     save_path=args.save_path,
+        #     # sym: str = "all",
+        # )
 
-        print("*"*50)
-        print("Finish Traing, Starting Testing...")
-        print("*"*50)
+        # print("*"*50)
+        # print("Finish Traing, Starting Testing...")
+        # print("*"*50)
 
-        # model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
-        data_dir = "data/data_sym5_test"
+        model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
+        data_dir = "data/data_sym3_test"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
@@ -293,7 +312,7 @@ if __name__ == "__main__":
             os.path.join(data_dir, f) not in EXCLUDE_FILES
         ]
         print("test_files2: ", test_files2)
-        test(test_files, N=N, model=model)
+        # test(test_files, N=N, model=model)
         test(test_files2, N=N, model=model)
     
     print("\n\n\n")
