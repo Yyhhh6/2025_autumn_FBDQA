@@ -21,7 +21,7 @@ SEED = 42
 # N_list = [5, 10, 20, 40, 60]
 N_list = [20]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
-file_dir="data/data_sym5_test"
+file_dir="data/data_sym3_test"
 
 def split_csv_files(
     data_dir,
@@ -84,7 +84,7 @@ def extract_feature(files_dir, N):
         midprice_list.append(n_midprice)
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
-    midprice_list = np.concatenate(midprice_list, axis=0)
+    # midprice_list = np.concatenate(midprice_list, axis=0)
 
     return data, labels_list, midprice_list
 
@@ -92,8 +92,9 @@ for N in N_list:
     train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
     test_files = ['data/data_sym5_test/snapshot_sym5_date56_pm.csv', 'data/data_sym5_test/snapshot_sym5_date9_am.csv', 'data/data_sym5_test/snapshot_sym5_date68_pm.csv', 'data/data_sym5_test/snapshot_sym5_date47_pm.csv', 'data/data_sym5_test/snapshot_sym5_date58_pm.csv', 'data/data_sym5_test/snapshot_sym5_date39_pm.csv', 'data/data_sym5_test/snapshot_sym5_date77_pm.csv', 'data/data_sym5_test/snapshot_sym5_date55_pm.csv', 'data/data_sym5_test/snapshot_sym5_date53_am.csv', 'data/data_sym5_test/snapshot_sym5_date49_am.csv', 'data/data_sym5_test/snapshot_sym5_date10_am.csv', 'data/data_sym5_test/snapshot_sym5_date52_am.csv', 'data/data_sym5_test/snapshot_sym5_date12_pm.csv', 'data/data_sym5_test/snapshot_sym5_date27_pm.csv']
     test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=N)
-    print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
-    model = XGBModel("/hdd/yyh/src/quant/models_sym5/model_20_all_20251229_002526.json")
+    # print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
+    print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}")
+    model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
     y_pred = model.predict(test_data)   # (N, 3)
 
@@ -126,16 +127,34 @@ for N in N_list:
         print(f"F0.5:      {f05:.4f}")
         pnl = []
 
-        for i, s in enumerate(signal):
-            if i + N >= len(n_midprice):
-                # pnl.append(0)
-                continue
-            if s == 2:      # Long
-                pnl.append(n_midprice[i+N] - n_midprice[i])
-            elif s == 0:    # Short
-                pnl.append(n_midprice[i] - n_midprice[i+N])
-            # else:           # Hold
-            #     pnl.append(0)
+        print("len(n_midprice): ", len(n_midprice))
+
+        start = 0
+        j = 0
+        for i in range(len(n_midprice)):
+            length = len(n_midprice[i])
+            for j in range(length):
+                if j + N >= length:
+                    break
+                if signal[j+start] == 2:      # Long
+                    pnl.append(n_midprice[i][j+N] - n_midprice[i][j])
+                elif signal[j+start] == 0:    # Short
+                    pnl.append(n_midprice[i][j] - n_midprice[i][j+N])
+            start += length
+            
+        print("****************start*******************: ", start)
+        # exit(0)
+
+        # for i, s in enumerate(signal):
+        #     if i + N >= len(n_midprice):
+        #         # pnl.append(0)
+        #         continue
+        #     if s == 2:      # Long
+        #         pnl.append(n_midprice[i+N] - n_midprice[i])
+        #     elif s == 0:    # Short
+        #         pnl.append(n_midprice[i] - n_midprice[i+N])
+        #     # else:           # Hold
+        #     #     pnl.append(0)
 
         pnl = np.array(pnl)
         total_pnl = pnl.sum()
