@@ -264,44 +264,44 @@ if __name__ == "__main__":
     print("===============================")
 
     for N in N_list:
-        # # 划分训练集、验证集、测试集
-        # train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+        # 划分训练集、验证集、测试集
+        train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
-        # print("train_files: ", train_files)
-        # print("val_files: ", val_files)
-        # print("test_files: ", test_files)
-        # # exit(0)
+        print("train_files: ", train_files)
+        print("val_files: ", val_files)
+        print("test_files: ", test_files)
+        # exit(0)
 
-        # # 提取训练集、验证集、测试集的特征
-        # train_data, train_labels = extract_feature(files_dir=train_files, N=N)
-        # val_data, val_labels = extract_feature(files_dir=val_files, N=N)
+        # 提取训练集、验证集、测试集的特征
+        train_data, train_labels = extract_feature(files_dir=train_files, N=N)
+        val_data, val_labels = extract_feature(files_dir=val_files, N=N)
 
-        # # print("train_data.shape: ", train_data.shape)
+        # print("train_data.shape: ", train_data.shape)
         
-        # model = XGBModel()
-        # model.train(
-        #     train_data,
-        #     train_labels,
-        #     val_data,
-        #     val_labels,
-        #     num_boost_round=args.num_boost_round,
-        #     early_stopping_rounds=150,
-        #     N=N,
-        #     weight1=args.weight1,
-        #     weight2=args.weight2,
-        #     weight3=args.weight3,
-        #     max_depth=args.max_depth,
-        #     subsample=args.subsample,
-        #     colsample_bytree=args.colsample_bytree,
-        #     min_child_weight=args.min_child_weight,
-        #     gamma=args.gamma,
-        #     save_path=args.save_path,
-        #     # sym: str = "all",
-        # )
+        model = XGBModel()
+        model.train(
+            train_data,
+            train_labels,
+            val_data,
+            val_labels,
+            num_boost_round=args.num_boost_round,
+            early_stopping_rounds=150,
+            N=N,
+            weight1=args.weight1,
+            weight2=args.weight2,
+            weight3=args.weight3,
+            max_depth=args.max_depth,
+            subsample=args.subsample,
+            colsample_bytree=args.colsample_bytree,
+            min_child_weight=args.min_child_weight,
+            gamma=args.gamma,
+            save_path=args.save_path,
+            # sym: str = "all",
+        )
 
-        # print("*"*50)
-        # print("Finish Traing, Starting Testing...")
-        # print("*"*50)
+        print("*"*50)
+        print("Finish Traing, Starting Testing...")
+        print("*"*50)
 
         model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
         data_dir = "data/data_sym3_test"
