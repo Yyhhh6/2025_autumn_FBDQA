@@ -4,22 +4,56 @@ import pandas as pd
 import numpy as np
 from .model import XGBModel
 from .data_process import assign_tick_time_labels, data_scale_Z_Score
+import json, re
 
 class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
-        # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
-        self.model = self.load_model(pth_path)
-        print(f"model loaded from {pth_path}")
+        # pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
+        # # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
+        # self.model = self.load_model(pth_path)
+        # print(f"model loaded from {pth_path}")
+
+        with open(os.path.join(os.path.dirname(__file__),"model_config.json"), "r") as f:
+            config = json.load(f)
+        self.target_confidence = {}
+        self.models = {}
+
+        for i in range(10):
+            sym = f"sym{i}"
+            self.target_confidence[i] = config[sym]["best_confidence"]
+            # path_dir = os.path.join(os.path.dirname(__file__), "models_"+sym)
+            # model_path = os.listdir(path_dir)[-1]
+            # self.models[i] = XGBModel(os.path.join(path_dir, model_path))
         
+        pattern = re.compile(r"model_.*_sym(\d+)_.*\.json")
+        for filename in os.listdir(os.path.dirname(__file__)):
+            match = pattern.search(filename)
+            if match:
+                # 提取索引 i
+                index = int(match.group(1))
+                file_path = os.path.join(os.path.dirname(__file__), filename)
+                
+                # 加载逻辑
+                try:
+                    self.models[index] = XGBModel(file_path)
+                    print(f"成功加载模型: {filename} -> models[{index}]")
+                except Exception as e:
+                    print(f"加载 {filename} 出错: {e}")
+
+        # 查看加载结果
+        print(f"已加载的模型索引: {list(self.models.keys())}")
+
+
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
         # 对输入数据进行预处理
+        model = self.models[int(x[0]['sym'].iloc[0])] # 由于一个list中sym一样
+        confidence = self.target_confidence[int(x[0]['sym'].iloc[0])]
         print(f"Received {len(x)} dataframes for prediction.")
         x_hat = self.preprocess(x)
         y = []
-        y_pred = self.model.predict(x_hat)   # (N, 3)
+        y_pred = model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
         signal[confidence < 0.6] = 1 # 信心不足时，预测为不变
@@ -400,3 +434,5 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
 
     x_hat = x_hat[:, -1, :]
     return x_hat
+
+predictor = Predictor()

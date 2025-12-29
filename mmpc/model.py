@@ -140,11 +140,7 @@ class XGBModel:
         """
         Returns probability: (N, 3)
         """
-        # dmat = xgb.DMatrix(X)
         dmat = xgb.DMatrix(X)
-        # best_iter_str = self.model.get_attr("best_iteration")
-
-        # return self.model.predict(dmat, iteration_range=(0, int(best_iter_str) + 1))
         return self.model.predict(dmat)
 
     # =========================

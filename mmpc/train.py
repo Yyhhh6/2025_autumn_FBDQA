@@ -212,6 +212,7 @@ def test(test_files, N, model):
 
 if __name__ == "__main__":
     import argparse
+    import shutil
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
     parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")#1300
     parser.add_argument("--weight1", type=float, default=1.0, help="Weight 1 for custom loss")
@@ -227,6 +228,7 @@ if __name__ == "__main__":
     parser.add_argument("--file_dir", type=str, default="./data/data_sym5_train", help="file_dir")
     parser.add_argument("--save_path", type=str, default="./models_sym5/", help="save_path")
 
+    parser.add_argument("--sym", type=str, default="all", help="sym identifier")
     args = parser.parse_args()
 
     # 打印参数
@@ -277,23 +279,30 @@ if __name__ == "__main__":
             min_child_weight=args.min_child_weight,
             gamma=args.gamma,
             save_path=args.save_path,
-            # sym: str = "all",
+            sym=args.sym,
         )
-
+        if hasattr(model, 'save_model_path'):
+            final_path = model.save_model_path
+            # 建立 sym 目录，例如 ./models_all/sym0/best_model.json
+            standard_dir = os.path.join(args.save_path, f"sym{args.sym}")
+            os.makedirs(standard_dir, exist_ok=True)
+            shutil.copy(final_path, os.path.join(standard_dir, "best_model.json"))
+            print(f"Standardized model for sym{args.sym} saved to {standard_dir}/best_model.json")
+    
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
         # model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
-        data_dir = "data/data_sym5_test"
-        test_files2 = [
-            os.path.join(data_dir, f)
-            for f in os.listdir(data_dir)
-            if f.endswith(".csv") and 
-            os.path.join(data_dir, f) not in EXCLUDE_FILES
-        ]
-        print("test_files2: ", test_files2)
+        # data_dir = "data/data_sym5_test"
+        # test_files2 = [
+        #     os.path.join(data_dir, f)
+        #     for f in os.listdir(data_dir)
+        #     if f.endswith(".csv") and 
+        #     os.path.join(data_dir, f) not in EXCLUDE_FILES
+        # ]
+        # print("test_files2: ", test_files2)
         test(test_files, N=N, model=model)
-        test(test_files2, N=N, model=model)
+        # test(test_files2, N=N, model=model)
     
     print("\n\n\n")

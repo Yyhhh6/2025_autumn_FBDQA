@@ -27,6 +27,6 @@ do
     do
         echo "执行配置: $cfg"
         # 执行训练命令，并将 i 注入到 file_dir 中
-        python -m mmpc.train --num_boost_round 8000 $cfg --file_dir ./data/data_sym$i | tee -a output$i.log
+        python -m mmpc.train --num_boost_round 8000 $cfg --sym $i --save_path ./models_sym$i --file_dir ./data/data_sym$i | tee -a output$i.log
     done
 done

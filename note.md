@@ -9,3 +9,19 @@
 [Done] ./data/data_sym8: train=140, test=16
 [Done] ./data/data_sym9: train=142, test=16
 Train / Test split (copy) and summary finished.
+
+## 分sym、参数搜索pipeline
+1. bash run.sh：修改想要搜索的参数组合
+2. python select_from_output.py：从output日志中选出最优参数组合，生成model_config.json
+3. bash run3.sh：根据config.txt中的参数组合，逐个训练不同sym的数据集，并保存模型到对应目录
+4. 将生成的所有model_symi文件夹、model_config.json放入mmpc文件夹
+
+for i in {0..9}; do
+    # 检查文件夹是否存在
+    if [ -d "models_sym$i" ]; then
+        # 将文件夹内的所有内容移动到当前目录
+        mv models_sym$i/* .
+        # 删除已经变空的文件夹
+        rmdir models_sym$i
+    fi
+done

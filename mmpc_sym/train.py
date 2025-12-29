@@ -259,6 +259,7 @@ def test_by_sym_function(test_files, N, models):
 
 if __name__ == "__main__":
     import argparse
+    import shutil
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
     parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
     parser.add_argument("--weight1", type=float, default=1.0, help="Weight 1 for custom loss")
@@ -329,6 +330,14 @@ if __name__ == "__main__":
                 sym=sym,
             )
 
+            if hasattr(model, 'save_model_path'):
+                final_path = model.save_model_path
+                # 建立 sym 目录，例如 ./models_all/sym0/best_model.json
+                standard_dir = os.path.join(args.save_path, sym)
+                os.makedirs(standard_dir, exist_ok=True)
+                shutil.copy(final_path, os.path.join(standard_dir, "best_model.json"))
+                print(f"Standardized model for {sym} saved to {standard_dir}/best_model.json")
+    
             models[sym] = model
 
         print("*"*50)
