@@ -62,15 +62,16 @@ class XGBModel:
         early_stopping_rounds: int = 50,
         seed: int = 42,
         N: int = 0,
-        weight1: float=2.0,
+        weight1: float=1.0,
         weight2: float=0.3,
-        weight3: float=2.0,
+        weight3: float=1.0,
         max_depth: int = 3,
         subsample: float = 0.5,
         colsample_bytree: float = 0.48,
         min_child_weight: int = 18,
         gamma: float = 4.3,
         save_path: str = "./models/",
+        sym: str = "all",
     ):
         """
         Train XGBoost from scratch
@@ -79,7 +80,7 @@ class XGBModel:
         params = {
             "objective": "multi:softprob",
             "num_class": 3,
-            "eval_metric": ["mlogloss", "auc", "merror"],
+            "eval_metric": "mlogloss",
             "max_depth": max_depth,   # 3 → 4
             "eta": 0.02,
             "subsample": subsample,   # 0.5 → 0.6
@@ -101,7 +102,14 @@ class XGBModel:
         if X_valid is not None and y_valid is not None:
             dvalid = xgb.QuantileDMatrix(X_valid, label=y_valid)
             evals = [(dvalid, "valid")]
+        from xgboost.callback import EarlyStopping
 
+        es = EarlyStopping(
+            rounds=early_stopping_rounds,
+            metric_name='mlogloss',  # 必须与日志输出的指标名一致
+            data_name='valid',       # 必须与 evals 中的名字 "valid" 一致
+            save_best=True           # 自动保存最优模型
+        )
         self.model = xgb.train(
             params=params,
             dtrain=dtrain,
@@ -109,15 +117,19 @@ class XGBModel:
             evals=evals,
             obj=make_weighted_softmax_obj(weight1=weight1, weight2=weight2, weight3=weight3), 
             early_stopping_rounds=early_stopping_rounds if len(evals) > 1 else None,
+            callbacks=[es],
             verbose_eval=50,
         )
+
+        # best_iter = self.model.best_iteration
+        # self.model.set_attr(best_iteration=str(best_iter))
 
         # 确保保存目录存在
         os.makedirs(save_path, exist_ok=True)
 
         # 生成时间戳
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(save_path, f"model_{N}_{timestamp}.json")
+        filename = os.path.join(save_path, f"model_{N}_{sym}_{timestamp}.json")
         self.model.save_model(filename)
         print(f"Model for N={N} trained and saved.")
 
@@ -129,7 +141,10 @@ class XGBModel:
         Returns probability: (N, 3)
         """
         # dmat = xgb.DMatrix(X)
-        dmat = xgb.QuantileDMatrix(X)
+        dmat = xgb.DMatrix(X)
+        # best_iter_str = self.model.get_attr("best_iteration")
+
+        # return self.model.predict(dmat, iteration_range=(0, int(best_iter_str) + 1))
         return self.model.predict(dmat)
 
     # =========================

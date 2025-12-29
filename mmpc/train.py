@@ -182,7 +182,7 @@ def test(test_files, N, model):
         print(f"F0.5:      {f05:.4f}")
         pnl = []
 
-        print("len(n_midprice): ", len(n_midprice))
+        # print("len(n_midprice): ", len(n_midprice))
 
         start = 0
         j = 0
@@ -197,7 +197,7 @@ def test(test_files, N, model):
                     pnl.append(n_midprice[i][j] - n_midprice[i][j+N])
             start += length
             
-        print("****************start*******************: ", start)
+        # print("****************start*******************: ", start)
         # exit(0)
 
         # for i, s in enumerate(signal):
@@ -232,7 +232,7 @@ def test(test_files, N, model):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
-    parser.add_argument("--num_boost_round", type=int, default=4000, help="Number of boosting rounds")
+    parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
     parser.add_argument("--weight1", type=float, default=1.5, help="Weight 1 for custom loss")
     parser.add_argument("--weight2", type=float, default=0.5, help="Weight 2 for custom loss")
     parser.add_argument("--weight3", type=float, default=1.5, help="Weight 3 for custom loss")
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym3_train", help="file_dir")
     parser.add_argument("--save_path", type=str, default="./models_ZZZ/", help="save_path")
 
     args = parser.parse_args()
@@ -276,7 +276,7 @@ if __name__ == "__main__":
         train_data, train_labels = extract_feature(files_dir=train_files, N=N)
         val_data, val_labels = extract_feature(files_dir=val_files, N=N)
 
-        # print("train_data.shape: ", train_data.shape)
+        print("train_data.shape: ", train_data.shape)
         
         model = XGBModel()
         model.train(
@@ -303,7 +303,7 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
+        # model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
         data_dir = "data/data_sym3_test"
         test_files2 = [
             os.path.join(data_dir, f)

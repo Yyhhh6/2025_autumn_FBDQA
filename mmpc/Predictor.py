@@ -117,7 +117,7 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'high_20', 'low_20', 'pos_20', 
         'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
         'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
-        # 'mid_diff2_lr_k', 'mid_diff2_lr_r2', 'mid_diff2_trend_strength',
+        'mid_diff2_lr_k', 'mid_diff2_lr_r2', 'mid_diff2_trend_strength',
         'trend_regime', 'trend_strength_gated', 
         'price_move_capacity', 'trend_liquidity_ratio'
     ]
@@ -129,7 +129,9 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'ask1_ma40', 'ask1_ma60',
         'bid1_ma40', 'bid1_ma60',
         'high_50', 'low_50', 'pos_50',
-        # 'trend_align_10_30', 'trend_align_30_60', 'trend_confidence'
+        'trend_align_10_30', 'trend_align_30_60', 'trend_confidence',
+        'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10',
+        'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
     ]
 
     new_columns = [
@@ -302,16 +304,24 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         ).astype(int)
         df['trend_strength_gated'] = df['mid_trend_strength'] * df['trend_regime']
 
-        # k_10, r2_10 = rolling_lr_features(df['mid_price'].to_numpy(), window=10)
-        # k_30, r2_30 = k, r2
-        # k_60, r2_60 = rolling_lr_features(df['mid_price'].to_numpy(), window=60)
-        # df['trend_align_10_30'] = (np.sign(k_10) == np.sign(k_30)).astype(int)
-        # df['trend_align_30_60'] = (np.sign(k_30) == np.sign(k_60)).astype(int)
-        # df['trend_confidence'] = (
-        #     np.sign(k_10) * r2_10 +
-        #     np.sign(k_30) * r2_30 +
-        #     np.sign(k_60) * r2_60
-        # )
+        k_10, r2_10 = rolling_lr_features(df['mid_price'].to_numpy(), window=10)
+        k_30, r2_30 = k, r2
+        k_60, r2_60 = rolling_lr_features(df['mid_price'].to_numpy(), window=60)
+        df['trend_align_10_30'] = (np.sign(k_10) == np.sign(k_30)).astype(int)
+        df['trend_align_30_60'] = (np.sign(k_30) == np.sign(k_60)).astype(int)
+        df['trend_confidence'] = (
+            np.sign(k_10) * r2_10 +
+            np.sign(k_30) * r2_30 +
+            np.sign(k_60) * r2_60
+        )
+
+        df['mid_lr_k_10'] = k_10   # 斜率
+        df['mid_lr_r2_10'] = r2_10   # 拟合优度
+        df['mid_trend_strength_10'] = np.sign(k_10) * r2_10
+        
+        df['mid_lr_k_60'] = k_60   # 斜率
+        df['mid_lr_r2_60'] = r2_60   # 拟合优度
+        df['mid_trend_strength_60'] = np.sign(k) * r2
 
         # 盘口是否允许价格往某个方向动？
         df['price_move_capacity'] = df['mid_lr_k'] / (df['relative_spread'] + 1e-6)
@@ -352,11 +362,11 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['mid_diff1_lr_r2'] = r2   # 拟合优度
         df['mid_diff1_trend_strength'] = np.sign(k) * r2
 
-        # # mid_diff2线性回归
-        # k, r2 = rolling_lr_features(df['mid_diff2'].to_numpy())
-        # df['mid_diff2_lr_k'] = k   # 斜率
-        # df['mid_diff2_lr_r2'] = r2   # 拟合优度
-        # df['mid_diff2_trend_strength'] = np.sign(k) * r2
+        # mid_diff2线性回归
+        k, r2 = rolling_lr_features(df['mid_diff2'].to_numpy())
+        df['mid_diff2_lr_k'] = k   # 斜率
+        df['mid_diff2_lr_r2'] = r2   # 拟合优度
+        df['mid_diff2_trend_strength'] = np.sign(k) * r2
 
         extra_feats = {}
         # 价格冲击方向

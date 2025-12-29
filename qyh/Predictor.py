@@ -4,26 +4,41 @@ import pandas as pd
 import numpy as np
 from .model import XGBModel
 from .data_process import assign_tick_time_labels, data_scale_Z_Score
+import sys
 
 class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251227_043202.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
         
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
         # 对输入数据进行预处理
+        # 构造 debug 信息
+        info = []
+        info.append(f"x type: {type(x)}")
+        info.append(f"x length: {len(x)}")
+
+        for i, df in enumerate(x[:3]):  # 只看前 3 个
+            info.append(
+                f"[{i}] shape={df.shape}, "
+                f"cols={list(df.columns)[:10]}, "
+                f"head:\n{df.head(3)}"
+            )
+
+        msg = "\n".join(info)
+
+        raise NotImplementedError(msg)
         print(f"Received {len(x)} dataframes for prediction.")
         x_hat = self.preprocess(x)
         y = []
         y_pred = self.model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
-        target_confidence = 0.83
-        signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
+        signal[confidence < 0.75] = 1 # 信心不足时，预测为不变
         y.append(signal.tolist())
         y = np.array(y).T.tolist()
         # 确保返回格式为 List[List[int]]
@@ -130,7 +145,9 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'ask1_ma40', 'ask1_ma60',
         'bid1_ma40', 'bid1_ma60',
         'high_50', 'low_50', 'pos_50',
-        'trend_align_10_30', 'trend_align_30_60', 'trend_confidence'
+        'trend_align_10_30', 'trend_align_30_60', 'trend_confidence',
+        'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10',
+        'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
     ]
 
     new_columns = [
@@ -313,6 +330,14 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
             np.sign(k_30) * r2_30 +
             np.sign(k_60) * r2_60
         )
+
+        df['mid_lr_k_10'] = k_10   # 斜率
+        df['mid_lr_r2_10'] = r2_10   # 拟合优度
+        df['mid_trend_strength_10'] = np.sign(k_10) * r2_10
+        
+        df['mid_lr_k_60'] = k_60   # 斜率
+        df['mid_lr_r2_60'] = r2_60   # 拟合优度
+        df['mid_trend_strength_60'] = np.sign(k) * r2
 
         # 盘口是否允许价格往某个方向动？
         df['price_move_capacity'] = df['mid_lr_k'] / (df['relative_spread'] + 1e-6)
