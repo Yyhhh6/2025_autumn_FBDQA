@@ -23,7 +23,7 @@ SEED = 42
 N_list = [20]
 # file_dir = "./data/data_raw"
 file_dir = "./data/data_sym_test"
-model_dir = "./"
+model_dir = "./mmpc"
 
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
 
@@ -81,7 +81,7 @@ def extract_feature_test(files_dir, N):
         midprice_list.append(n_midprice)
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
-    midprice_list = np.concatenate(midprice_list, axis=0)
+    # midprice_list = np.concatenate(midprice_list, axis=0)
 
     return data, labels_list, midprice_list
 
@@ -127,7 +127,7 @@ def get_model_files_by_sym(model_dir):
 overall_metrics = []
 sym_model_dict = get_model_files_by_sym(model_dir)
 # print("sym_model_dict: ", sym_model_dict)
-
+import json
 for N in N_list:
     train_files, val_files, test_files = split_csv_files(
         data_dir=file_dir,
@@ -139,22 +139,29 @@ for N in N_list:
 
     sym_files_dict = group_files_by_sym(test_files)
     # print("sym_files_dict: ", sym_files_dict)
-        
+    with open(os.path.join(os.path.dirname(__file__),"model_config.json"), "r") as f:
+        config = json.load(f)
+    best_confidence = {}
+    for i in range(10):
+        sym = f"sym{i}"
+        best_confidence[sym] = config[sym]["best_confidence"]
+    # print(f"best_confidence is {best_confidence}")
+
+    target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
+    _all_y = {}
+    _all_labels = {}
+    _all_pnl = {}
     for sym, sym_files in sym_files_dict.items():
         model_path = sym_model_dict.get(sym)
         if not model_path:
-            print(f"No model found for sym{sym}, skipping.")
+            print(f"No model found for {sym}, skipping.")
             continue
-        print(f"Evaluating sym{sym} with {len(sym_files)} files using model {model_path}")
+        print(f"Evaluating {sym} with {len(sym_files)} files using model {model_path}")
         test_data, test_labels, n_midprice = extract_feature_test(sym_files, N)
         model = XGBModel(model_path)
         y_pred = model.predict(test_data)
 
-        target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
-        _all_y = {}
-        _all_labels = {}
-        _all_pnl = {}
-        for target_confidence in target_confidences:
+        for target_confidence in [best_confidence[sym]]:
             _all_y[target_confidence] = []
             _all_labels[target_confidence] = []
             _all_pnl[target_confidence] = []
@@ -176,13 +183,18 @@ for N in N_list:
             f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
 
             pnl = []
-            for i, s in enumerate(signal):
-                if i + N >= len(n_midprice):
-                    continue
-                if s == 2:
-                    pnl.append(n_midprice[i+N] - n_midprice[i])
-                elif s == 0:
-                    pnl.append(n_midprice[i] - n_midprice[i+N])
+            start = 0
+            j = 0
+            for i in range(len(n_midprice)):
+                length = len(n_midprice[i])
+                for j in range(length):
+                    if j + N >= length:
+                        break
+                    if signal[j+start] == 2:      # Long
+                        pnl.append(n_midprice[i][j+N] - n_midprice[i][j])
+                    elif signal[j+start] == 0:    # Short
+                        pnl.append(n_midprice[i][j] - n_midprice[i][j+N])
+                start += length
             _all_pnl[target_confidence].append(np.array(pnl))
 
             pnl = np.array(pnl)
@@ -208,53 +220,29 @@ for N in N_list:
                 "Num_Trades": num_trades,
                 "Final_Score": final_score, 
             })
-
-    for target_confidence in target_confidences:
-        all_y = _all_y[target_confidence]
-        all_labels = _all_labels[target_confidence]
-        all_pnl = _all_pnl[target_confidence]
-
-        # 合并所有 sym 数据
-        all_y = np.concatenate(all_y)
-        all_labels = np.concatenate(all_labels)
-        all_pnl = np.concatenate(all_pnl)
-
-        # 总体指标计算
-        index_recall = all_labels != 1
-        recall = sum(all_y[index_recall] == all_labels[index_recall]) / sum(index_recall)
-        index_precision = all_y != 1
-        precision = sum(all_y[index_precision] == all_labels[index_precision]) / sum(index_precision)
-        beta = 0.5
-        f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
-
-        total_pnl = all_pnl.sum()
-        avg_pnl = all_pnl.mean()
-        trade_pnl = all_pnl[all_pnl != 0]
-        win_rate = (trade_pnl > 0).mean() if len(trade_pnl) > 0 else 0
-        num_trades = len(trade_pnl)
-
-        final_score = f05 * (avg_pnl - 0.0006) * (avg_pnl - 0.0006) * 10000 * 10000
-        if avg_pnl - 0.0006 < 0:
-            final_score = -final_score
-
-        overall_metrics.append({
-            "sym": "Overall",
-            "target_confidence": target_confidence,
-            "Precision": precision,
-            "Recall": recall,
-            "F0.5": f05,
-            "Total_PNL": total_pnl,
-            "Avg_PNL": avg_pnl,
-            "Win_Rate": win_rate,
-            "Num_Trades": num_trades,
-            "Final_Score": final_score, 
-        })
-
+    
     # ------------------ 输出指标 ------------------
     df_metrics = pd.DataFrame(overall_metrics)
     print("Per-sym metrics:\n", df_metrics)
+    
+    # 计算数值列的平均值
+    avg_metrics = df_metrics.mean(numeric_only=True)
+    
+    # 补全最后一条汇总记录
+    overall_metrics.append({
+        "sym": "AVG",
+        "target_confidence": None,  # 均值的置信度阈值无实际意义
+        "Precision": avg_metrics.get("Precision"),
+        "Recall": avg_metrics.get("Recall"),
+        "F0.5": avg_metrics.get("F0.5"),
+        "Total_PNL": avg_metrics.get("Total_PNL"),
+        "Avg_PNL": avg_metrics.get("Avg_PNL"),
+        "Win_Rate": avg_metrics.get("Win_Rate"),
+        "Num_Trades": avg_metrics.get("Num_Trades"),
+        "Final_Score": avg_metrics.get("Final_Score"),
+    })
 
     # 保存到 CSV 文件
     output_file = "./results/per_sym_metrics.csv"
-    df_metrics.to_csv(output_file, index=False)  # 不保存行索引
+    overall_metrics.to_csv(output_file, index=False)  # 不保存行索引
     print(f"Per-sym metrics saved to {output_file}")
