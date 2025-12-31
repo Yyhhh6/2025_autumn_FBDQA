@@ -122,7 +122,7 @@ def extract_feature_test(files_dir, N, is_local=True, is_slice=False):
                 if df.empty:
                     raise ValueError(f"File {file} is empty.")
                 df = df.reset_index(drop=True)
-                df, labels = preprocess_platform(df, is_local=is_local)
+                df, labels = preprocess_platform(df, is_local=is_local, is_upload=False)
                 df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
 
                 n_midprice = n_midprice[99:]
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym0_train", help="file_dir")
     parser.add_argument("--save_path", type=str, default="./models_ZZZ/", help="save_path")
 
     args = parser.parse_args()
@@ -299,7 +299,7 @@ if __name__ == "__main__":
         print("*"*50)
 
         # model = XGBModel("models_ZZZ/model_20_all_20251231_024421.json")
-        data_dir = "data/data_sym0_test_select"
+        data_dir = "data/data_sym0_test"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         print("test_files2: ", test_files2)
 
         test(test_files2, N=N, model=model)
-        test(test_files2, N=N, model=model, is_slice=True, is_local=True)
         test(test_files2, N=N, model=model, is_slice=True, is_local=False)
+        test(test_files2, N=N, model=model, is_slice=True, is_local=True)
     
     print("\n\n\n")
