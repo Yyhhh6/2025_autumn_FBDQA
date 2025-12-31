@@ -40,7 +40,7 @@ class Predictor():
         return XGBModel(model_path)
 
     def preprocess(self, x: Union[List[pd.DataFrame], pd.DataFrame]):
-        return preprocess(x)
+        return preprocess_platform(x)
 
 def rolling_lr_k_r2(y: np.ndarray):
     if len(y) < 2:
@@ -358,11 +358,11 @@ def preprocess_slice(x: list[pd.DataFrame], lags=[1, 2, 3, 4, 5, 10, 20, 30, 40,
     return concat_df
 
 
-def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=True):
+def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=True, is_upload=True):
     """
     更改 preprocess 逻辑，适用于公榜评测的更快推理
     """
-    if True:    
+    if is_upload==False:    
         # 本地评测，pd.DataFrame 先切分为 100 个 tick 个片段
         if isinstance(x, pd.DataFrame):
             x = [x]
