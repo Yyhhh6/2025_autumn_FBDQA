@@ -162,7 +162,8 @@ def test(test_files, N, model, is_local=True, is_slice=False):
     y_pred = model.predict(test_data)   # (N, 3)
     print("y_pred shape: ", y_pred.shape)
 
-    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    # target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    target_confidences = [0.5, 0.55, 0.6]
     # target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
 
     for target_confidence in target_confidences:
@@ -297,7 +298,7 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        model = XGBModel("models_ZZZ/model_20_all_20251230_162731.json")
+        # model = XGBModel("models_ZZZ/model_20_all_20251231_024421.json")
         data_dir = "data/data_sym0_test_select"
         test_files2 = [
             os.path.join(data_dir, f)
@@ -307,8 +308,8 @@ if __name__ == "__main__":
         ]
         print("test_files2: ", test_files2)
 
-        # test(test_files2, N=N, model=model)
+        test(test_files2, N=N, model=model)
         test(test_files2, N=N, model=model, is_slice=True, is_local=True)
-        # test(test_files2, N=N, model=model, is_slice=True, is_local=False)
+        test(test_files2, N=N, model=model, is_slice=True, is_local=False)
     
     print("\n\n\n")

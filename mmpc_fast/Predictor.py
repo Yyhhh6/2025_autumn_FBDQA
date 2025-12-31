@@ -126,7 +126,8 @@ def compare_dfs(df1, df2, tol=1e-5):
     df1_common = df1.loc[common_idx, common_cols]
     df2_common = df2.loc[common_idx, common_cols]
     
-    diff_mask = (df1_common - df2_common).abs() > tol
+    # diff_mask = (df1_common - df2_common).abs() > tol
+    diff_mask = ~(df1_common.eq(df2_common) | (df1_common.isna() & df2_common.isna()))
     num_diff = diff_mask.sum().sum()
     print("Number of different values (tol={}):".format(tol), num_diff)
     
@@ -348,7 +349,13 @@ def preprocess_slice(x: list[pd.DataFrame], lags=[1, 2, 3, 4, 5, 10, 20, 30, 40,
 
         x_extract.append(lag_feats)
 
-    return pd.DataFrame(x_extract)
+    # concat_df = pd.DataFrame(x_extract)
+    concat_df = pd.DataFrame(x_extract).astype('float32')
+
+    # 对列的标签进行排序
+    concat_df = concat_df[sorted(concat_df.columns)]
+
+    return concat_df
 
 
 def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=True):
@@ -372,9 +379,9 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        x_extract1 = preprocess_slice(x_slice)
+        # x_extract1 = preprocess_slice(x_slice)
         # print("x_extract1.shape: ", x_extract1.shape)
-        x_extract2 = preprocess_local(x_slice, is_slice=True)
+        # x_extract2 = preprocess_local(x_slice, is_slice=True)
         # print("x_extract2.shape: ", x_extract2.shape)
 
         # # 对列排序
@@ -383,8 +390,8 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         # x_extract1.to_csv("x_extract1.csv", index=True)
         # x_extract2.to_csv("x_extract2.csv", index=True)
 
-        compare_dfs(x_extract1, x_extract2)
-        exit(0)
+        # compare_dfs(x_extract1, x_extract2)
+        # exit(0)
 
         if is_local==False:
             # 方法一
@@ -441,7 +448,8 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
         # 'trend_persistence', 'trend_flip', 'trend_age',
         # 'trend_regime', 'trend_strength_gated', 
-        'price_move_capacity', 'trend_liquidity_ratio',
+        'price_move_capacity', 
+        'trend_liquidity_ratio',
         'trend_align_10_30', 'trend_align_30_60', 'trend_align_10_60', 'trend_confidence',
         'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10', 
         'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
@@ -703,6 +711,9 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     # print("concat_df.shape: ", concat_df.shape)   # (1900, 950)
     # print("label.shape: ", label.shape)   # (1900,)
     # print("x_hat.shape: ", x_hat.shape)   # (1900, 950)
+
+    # 对列的标签进行排序
+    concat_df = concat_df[sorted(concat_df.columns)]
 
     if is_train:
         return concat_df, label
