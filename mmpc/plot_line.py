@@ -28,9 +28,9 @@ def plot_prediction_results(mid_prices, signals, labels, start_idx=0, length=500
     # 截取特定窗口的数据
     mid_prices = np.concatenate(mid_prices, axis=0)
 
-    end_idx = len(mid_prices)
-    # end_idx = 7500
-    start_idx = 0
+    # end_idx = len(mid_prices)
+    end_idx = 14500
+    start_idx = 13000
     prices = mid_prices[start_idx:end_idx]
     preds = signals[start_idx:end_idx]
     actuals = labels[start_idx:end_idx]
@@ -70,7 +70,7 @@ def plot_prediction_results(mid_prices, signals, labels, start_idx=0, length=500
     plt.ylabel("Price")
     plt.grid(True, alpha=0.2)
     plt.show()
-    plt.savefig("mmpc/prediction_results_part2.png", dpi=300)
+    plt.savefig("mmpc/prediction_results_part1.png", dpi=300)
 
 # 调用函数进行绘图（假设 n_midprice, signal, test_labels 已经准备好）
 # 注意：确保 mid_price 的长度与 signal 一致

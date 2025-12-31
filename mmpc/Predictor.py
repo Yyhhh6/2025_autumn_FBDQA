@@ -22,7 +22,7 @@ class Predictor():
 
         for i in range(10):
             sym = f"sym{i}"
-            self.target_confidence[i] = config[i]["best_confidence"]
+            self.target_confidence[i] = config[sym]["best_confidence"]
             # path_dir = os.path.join(os.path.dirname(__file__), "models_"+sym)
             # model_path = os.listdir(path_dir)[-1]
             # self.models[i] = XGBModel(os.path.join(path_dir, model_path))
@@ -47,19 +47,19 @@ class Predictor():
 
 
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
-        # 对输入数据进行预处理
-        print(f"Predicting for sym: {int(x[0]['sym'].iloc[0])}, number of dataframes: {len(x)}")
-        if int(x[0]['sym'].iloc[0]) != 1:
-            return [[1]*len(x[0])]  # 仅对sym1进行预测，其他返回不变信号
-        model = self.models[int(x[0]['sym'].iloc[0])] # 由于一个list中sym一样
-        confidence = self.target_confidence[int(x[0]['sym'].iloc[0])]
-        print(f"Received {len(x)} dataframes for prediction.")
+        sym_id = int(x[0]['sym'].iloc[0])
+        batch_size = len(x)
+        if sym_id != 1:
+            return [[1] for _ in range(batch_size)] 
+        model = self.models[sym_id]
+        target_confidence = self.target_confidence[sym_id]
+
         x_hat = self.preprocess(x)
         y = []
         y_pred = model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
-        signal[confidence < 0.6] = 1 # 信心不足时，预测为不变
+        signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
         y.append(signal.tolist())
         y = np.array(y).T.tolist()
         # 确保返回格式为 List[List[int]]
@@ -72,7 +72,7 @@ class Predictor():
         return XGBModel(model_path)
 
     def preprocess(self, x: Union[List[pd.DataFrame], pd.DataFrame]):
-        return preprocess(x, N=20, is_train=False)
+        return preprocess(x)
 
 def rolling_lr_k_r2(y: np.ndarray):
     if len(y) < 2:
@@ -142,16 +142,16 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None, is_train=Fals
         'spread_diff1', "spread_diff2", 'spread2_diff1', "spread2_diff2", 'spread3_diff1', "spread3_diff2", 
         'relative_spread_diff1', "relative_spread_diff2", 'relative_spread2_diff1', "relative_spread2_diff2", 'relative_spread3_diff1', "relative_spread3_diff2", 
         'bsize1', 'bsize2', 'bsize3', 'bsize4', 'bsize5', 'asize1', 'asize2', 'asize3', 'asize4', 'asize5', 'amount',  
-        # 'mid_price_ma5', 'mid_price_ma10', 'mid_price_ma20', 
-        # "time_label", 'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
+        'mid_price_ma5', 'mid_price_ma10', 'mid_price_ma20', 
+        "time_label", 'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
         'obi_1', 'obi_3', 'mid_diff1', 'mid_diff2', 
         'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
         'bid_depth_slope', 'ask_depth_slope', 'obi_sq', 
-        # 'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 
-        # 'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 
-        # 'high_20', 'low_20', 'pos_20', 
-        # 'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
-        # 'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
+        'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 
+        'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 
+        'high_20', 'low_20', 'pos_20', 
+        'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
+        'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
         # 'mid_diff2_lr_k', 'mid_diff2_lr_r2', 'mid_diff2_trend_strength',
         'trend_regime', 'trend_strength_gated', 
         'price_move_capacity', 'trend_liquidity_ratio', 
@@ -160,18 +160,18 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None, is_train=Fals
 
     lags2=[1, 2, 3, 4, 5, 10, 15, 20]
     raw_cols2 = [
-        # 'trend_persistence', 'trend_flip', 'trend_age',
-        # 'mid_price_ma40', 'mid_price_ma60', 
-        # 'ask1_ma40', 'ask1_ma60',
-        # 'bid1_ma40', 'bid1_ma60',
-        # 'high_50', 'low_50', 'pos_50',
-        # 'trend_align_10_30', 'trend_align_30_60', 'trend_confidence',
-        # 'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10',
-        # 'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
+        'trend_persistence', 'trend_flip', 'trend_age',
+        'mid_price_ma40', 'mid_price_ma60', 
+        'ask1_ma40', 'ask1_ma60',
+        'bid1_ma40', 'bid1_ma60',
+        'high_50', 'low_50', 'pos_50',
+        'trend_align_10_30', 'trend_align_30_60', 'trend_confidence',
+        'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10',
+        'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
     ]
 
     new_columns = [
-        # 'high_100', 'low_100', 'pos_100',
+        'high_100', 'low_100', 'pos_100',
     ]
     
     if isinstance(x, pd.DataFrame):
