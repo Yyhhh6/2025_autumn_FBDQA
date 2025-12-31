@@ -232,7 +232,7 @@ def test(test_files, N, model):
         print(f"Trades:      {num_trades}")
         print(f"Win Rate:    {win_rate:.3f}")
         print(f"Final Score:    {final_score:.3f}")
-# python -m mmpc.train --weight1 1.0 --weight2 0.5 --weight3 1.0 --max_depth 3 --subsample 0.6 --colsample_bytree 0.48 --min_child_weight 18 --gamma 4.3 --sym 0 --file_dir ./data/data_sym0_train
+# python -m mmpc.train --weight1 1.0 --weight2 1.0 --weight3 1.0 --max_depth 3 --subsample 0.5 --colsample_bytree 0.48 --min_child_weight 18 --gamma 4.3 --sym 1 --file_dir ./data/data_sym1_train --penalty_scale 10.0 --save_path ./models_sym1/
 if __name__ == "__main__":
     import argparse
     import shutil
@@ -309,14 +309,7 @@ if __name__ == "__main__":
             penalty_scale=args.penalty_scale,
             train_profits=train_profits
         )
-        if hasattr(model, 'save_model_path'):
-            final_path = model.save_model_path
-            # 建立 sym 目录，例如 ./models_all/sym0/best_model.json
-            standard_dir = os.path.join(args.save_path, f"sym{args.sym}")
-            os.makedirs(standard_dir, exist_ok=True)
-            shutil.copy(final_path, os.path.join(standard_dir, "best_model.json"))
-            print(f"Standardized model for sym{args.sym} saved to {standard_dir}/best_model.json")
-    
+
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)

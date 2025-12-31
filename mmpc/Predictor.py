@@ -22,7 +22,7 @@ class Predictor():
 
         for i in range(10):
             sym = f"sym{i}"
-            self.target_confidence[i] = config[sym]["best_confidence"]
+            self.target_confidence[i] = config[i]["best_confidence"]
             # path_dir = os.path.join(os.path.dirname(__file__), "models_"+sym)
             # model_path = os.listdir(path_dir)[-1]
             # self.models[i] = XGBModel(os.path.join(path_dir, model_path))
@@ -48,6 +48,9 @@ class Predictor():
 
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
         # 对输入数据进行预处理
+        print(f"Predicting for sym: {int(x[0]['sym'].iloc[0])}, number of dataframes: {len(x)}")
+        if int(x[0]['sym'].iloc[0]) != 1:
+            return [[1]*len(x[0])]  # 仅对sym1进行预测，其他返回不变信号
         model = self.models[int(x[0]['sym'].iloc[0])] # 由于一个list中sym一样
         confidence = self.target_confidence[int(x[0]['sym'].iloc[0])]
         print(f"Received {len(x)} dataframes for prediction.")

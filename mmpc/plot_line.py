@@ -3,18 +3,18 @@ from .model import XGBModel
 from .test import extract_feature
 import os
 
-test_dir = "./data/data_sym1_test"
+test_dir = "./data/data_sym7_test"
 test_files = [
     os.path.join(test_dir, f) for f in os.listdir(test_dir) if f.endswith(".csv")
 ]
-model = XGBModel("/hdd/yyh/src/quant/models_ZZZ/model_20_1_20251230_215625.json")
+model = XGBModel("/hdd/yyh/src/quant/mmpc/model_20_sym7_20251231_072506.json")
 
 test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=20)
 
 y_pred = model.predict(test_data)   # (N, 3)
 confidence = np.max(y_pred, axis=1)
 signal = np.argmax(y_pred, axis=1)
-signal[confidence < 0.75] = 1
+signal[confidence < 0.65] = 1
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,9 +28,9 @@ def plot_prediction_results(mid_prices, signals, labels, start_idx=0, length=500
     # 截取特定窗口的数据
     mid_prices = np.concatenate(mid_prices, axis=0)
 
-    # end_idx = len(mid_prices)
-    start_idx = 5500
-    end_idx = 7500
+    end_idx = len(mid_prices)
+    # end_idx = 7500
+    start_idx = 0
     prices = mid_prices[start_idx:end_idx]
     preds = signals[start_idx:end_idx]
     actuals = labels[start_idx:end_idx]
