@@ -105,6 +105,7 @@ class XGBModel:
 
         if X_valid is not None and y_valid is not None:
             dvalid = xgb.DMatrix(X_valid, label=y_valid)
+            dvalid = xgb.DMatrix(X_valid, label=y_valid)
             evals = [(dvalid, "valid")]
 
         from xgboost.callback import EarlyStopping

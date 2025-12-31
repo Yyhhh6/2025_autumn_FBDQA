@@ -56,7 +56,7 @@ def extract_feature(files_dir, N):
     csv_files = files_dir
     def process_file(file, N):
         if os.path.exists(file):
-            df = pd.read_csv(file)#[:-N]
+            df = pd.read_csv(file)#[:-N]    # TODO: 
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
@@ -186,7 +186,7 @@ def test(test_files, N, model):
         print(f"F0.5:      {f05:.4f}")
         pnl = []
 
-        print("len(n_midprice): ", len(n_midprice))
+        # print("len(n_midprice): ", len(n_midprice))
 
         start = 0
         j = 0
@@ -201,7 +201,7 @@ def test(test_files, N, model):
                     pnl.append(n_midprice[i][j] - n_midprice[i][j+N])
             start += length
             
-        print("****************start*******************: ", start)
+        # print("****************start*******************: ", start)
         # exit(0)
 
         # for i, s in enumerate(signal):
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     import argparse
     import shutil
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
-    parser.add_argument("--num_boost_round", type=int, default=4000, help="Number of boosting rounds")
+    parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
     parser.add_argument("--weight1", type=float, default=1.5, help="Weight 1 for custom loss")
     parser.add_argument("--weight2", type=float, default=0.5, help="Weight 2 for custom loss")
     parser.add_argument("--weight3", type=float, default=1.5, help="Weight 3 for custom loss")
@@ -248,8 +248,8 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_ZZZ/", help="save_path")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym0_train", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models_ZZZ_sym0/", help="save_path")
 
     parser.add_argument("--sym", type=str, default="all", help="sym identifier")
     parser.add_argument("--penalty_scale", type=float, default=5.0, help="penalty_scale for custom loss")
@@ -276,6 +276,10 @@ if __name__ == "__main__":
         # # 划分训练集、验证集、测试集
         train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
+        print("train_files: ", train_files)
+        print("val_files: ", val_files)
+        print("test_files: ", test_files)
+        # exit(0)
         print("train_files: ", train_files)
         print("val_files: ", val_files)
         print("test_files: ", test_files)
@@ -310,6 +314,9 @@ if __name__ == "__main__":
             train_profits=train_profits
         )
 
+        print("*"*50)
+        print("Finish Traing, Starting Testing...")
+        print("*"*50)
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
