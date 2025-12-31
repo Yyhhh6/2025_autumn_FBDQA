@@ -9,7 +9,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20251229_142601.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -269,13 +269,13 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         # 时间标签（TODO: check准确性）
         df['time_label'] = assign_tick_time_labels(df['time'])
         
-        # 过去20、50、100个数据中的最高价和最低价（TODO: 是否有用）
-        df['high_20'] = df['mid_price'].rolling(window=20, min_periods=1).max()
-        df['low_20'] = df['mid_price'].rolling(window=20, min_periods=1).min()
-        df['high_50'] = df['mid_price'].rolling(window=50, min_periods=1).max()
-        df['low_50'] = df['mid_price'].rolling(window=50, min_periods=1).min()
-        df['high_100'] = df['mid_price'].rolling(window=100, min_periods=1).max()
-        df['low_100'] = df['mid_price'].rolling(window=100, min_periods=1).min()
+        # # 过去20、50、100个数据中的最高价和最低价（TODO: 是否有用）
+        # df['high_20'] = df['mid_price'].rolling(window=20, min_periods=1).max()
+        # df['low_20'] = df['mid_price'].rolling(window=20, min_periods=1).min()
+        # df['high_50'] = df['mid_price'].rolling(window=50, min_periods=1).max()
+        # df['low_50'] = df['mid_price'].rolling(window=50, min_periods=1).min()
+        # df['high_100'] = df['mid_price'].rolling(window=100, min_periods=1).max()
+        # df['low_100'] = df['mid_price'].rolling(window=100, min_periods=1).min()
 
         # 相对位置
         df['pos_20'] = (df['mid_price'] - df['low_20']) / (df['high_20'] - df['low_20'] + 1e-6)
@@ -328,16 +328,16 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         # df['trend_liquidity_ratio'] = df['mid_trend_strength'] / (df['relative_spread'] + 1e-6)
 
         # 时间衰减盘口特征
-        decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
-        decay = decay / decay.sum()
-        def decay_mean(x):
-            w = decay[-len(x):]
-            return np.sum(x * w)
-        df['bid1_decay'] = df['bid1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        df['ask1_decay'] = df['ask1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        df['spread_decay'] = df['spread'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        df['bsize1_decay'] = df['bsize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        df['asize1_decay'] = df['asize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        # decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
+        # decay = decay / decay.sum()
+        # def decay_mean(x):
+        #     w = decay[-len(x):]
+        #     return np.sum(x * w)
+        # df['bid1_decay'] = df['bid1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        # df['ask1_decay'] = df['ask1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        # df['spread_decay'] = df['spread'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        # df['bsize1_decay'] = df['bsize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
+        # df['asize1_decay'] = df['asize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
         
         # 盘口不平衡
         df['obi_1'] = (df['bsize1'] - df['asize1']) / (df['bsize1'] + df['asize1'] + 1e-6)

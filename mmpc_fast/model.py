@@ -96,11 +96,11 @@ class XGBModel:
         }
 
         # dtrain = xgb.DMatrix(X_train, label=y_train)
-        dtrain = xgb.DMatrix(X_train, label=y_train)
+        dtrain = xgb.QuantileDMatrix(X_train, label=y_train)
 
         # evals = [(dtrain, "train")]
         if X_valid is not None and y_valid is not None:
-            dvalid = xgb.DMatrix(X_valid, label=y_valid)
+            dvalid = xgb.QuantileDMatrix(X_valid, label=y_valid)
             evals = [(dvalid, "valid")]
         from xgboost.callback import EarlyStopping
 

@@ -9,7 +9,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20251229_142601.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -52,17 +52,17 @@ def rolling_lr_k_r2(y: np.ndarray):
     r2 = r * r if np.isfinite(r) else 0.0
     return k, r2
 
-# def rolling_lr_features(y, window=30):
-#     ks = np.zeros(len(y))
-#     r2s = np.zeros(len(y))
+def rolling_lr_features(y, window=30):
+    ks = np.zeros(len(y))
+    r2s = np.zeros(len(y))
 
-#     for i in range(len(y)):
-#         sub = y[max(0, i-window+1):i+1]
-#         k, r2 = rolling_lr_k_r2(sub)
-#         ks[i] = k
-#         r2s[i] = r2
+    for i in range(len(y)):
+        sub = y[max(0, i-window+1):i+1]
+        k, r2 = rolling_lr_k_r2(sub)
+        ks[i] = k
+        r2s[i] = r2
 
-#     return ks, r2s
+    return ks, r2s
 
 def time_fixed_sample(df, cols, lags=[1, 2, 3, 4, 5, 10, 20, 30, 40, 60]):
     """
@@ -115,23 +115,23 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 
         'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 
         'high_20', 'low_20', 'pos_20', 
-        # 'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
-        # 'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
-        # 'mid_diff2_lr_k', 'mid_diff2_lr_r2', 'mid_diff2_trend_strength',
-        # 'trend_regime', 'trend_strength_gated', 
-        # 'price_move_capacity', 'trend_liquidity_ratio'
+        'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
+        'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
+        'mid_diff2_lr_k', 'mid_diff2_lr_r2', 'mid_diff2_trend_strength',
+        'trend_regime', 'trend_strength_gated', 
+        'price_move_capacity', 'trend_liquidity_ratio'
     ]
 
     lags2=[1, 2, 3, 4, 5, 10, 15, 20]
     raw_cols2 = [
-        # 'trend_persistence', 'trend_flip', 'trend_age',
+        'trend_persistence', 'trend_flip', 'trend_age',
         'mid_price_ma40', 'mid_price_ma60', 
         'ask1_ma40', 'ask1_ma60',
         'bid1_ma40', 'bid1_ma60',
         'high_50', 'low_50', 'pos_50',
-        # 'trend_align_10_30', 'trend_align_30_60', 'trend_confidence',
-        # 'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10',
-        # 'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
+        'trend_align_10_30', 'trend_align_30_60', 'trend_confidence',
+        'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10',
+        'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
     ]
 
     new_columns = [
@@ -282,50 +282,50 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['pos_50'] = (df['mid_price'] - df['low_50']) / (df['high_50'] - df['low_50'] + 1e-6)
         df['pos_100'] = (df['mid_price'] - df['low_100']) / (df['high_100'] - df['low_100'] + 1e-6)
 
-        # # 中间价线性回归（TODO: 可能是最有用的特征）
-        # k, r2 = rolling_lr_features(df['mid_price'].to_numpy())
-        # df['mid_lr_k'] = k   # 斜率
-        # df['mid_lr_r2'] = r2   # 拟合优度
-        # df['mid_trend_strength'] = np.sign(k) * r2
+        # 中间价线性回归（TODO: 可能是最有用的特征）
+        k, r2 = rolling_lr_features(df['mid_price'].to_numpy())
+        df['mid_lr_k'] = k   # 斜率
+        df['mid_lr_r2'] = r2   # 拟合优度
+        df['mid_trend_strength'] = np.sign(k) * r2
 
-        # # 信号的持续性
-        # df['trend_persistence'] = (
-        #     df['mid_trend_strength']
-        #     .rolling(20)
-        #     .apply(lambda x: np.sum(np.sign(x) == np.sign(x.iloc[-1])))
-        # )
-        # df['trend_flip'] = (np.sign(df['mid_lr_k']).diff() != 0).astype(int)
-        # df['trend_age'] = df['trend_flip'].rolling(50).sum()
+        # 信号的持续性
+        df['trend_persistence'] = (
+            df['mid_trend_strength']
+            .rolling(20)
+            .apply(lambda x: np.sum(np.sign(x) == np.sign(x.iloc[-1])))
+        )
+        df['trend_flip'] = (np.sign(df['mid_lr_k']).diff() != 0).astype(int)
+        df['trend_age'] = df['trend_flip'].rolling(50).sum()
 
-        # # 门控
-        # df['trend_regime'] = (
-        #     (df['mid_lr_r2'] > 0.25) &
-        #     (np.abs(df['mid_lr_k']) > np.percentile(np.abs(df['mid_lr_k']), 60))
-        # ).astype(int)
-        # df['trend_strength_gated'] = df['mid_trend_strength'] * df['trend_regime']
+        # 门控
+        df['trend_regime'] = (
+            (df['mid_lr_r2'] > 0.25) &
+            (np.abs(df['mid_lr_k']) > np.percentile(np.abs(df['mid_lr_k']), 60))
+        ).astype(int)
+        df['trend_strength_gated'] = df['mid_trend_strength'] * df['trend_regime']
 
-        # k_10, r2_10 = rolling_lr_features(df['mid_price'].to_numpy(), window=10)
-        # k_30, r2_30 = k, r2
-        # k_60, r2_60 = rolling_lr_features(df['mid_price'].to_numpy(), window=60)
-        # df['trend_align_10_30'] = (np.sign(k_10) == np.sign(k_30)).astype(int)
-        # df['trend_align_30_60'] = (np.sign(k_30) == np.sign(k_60)).astype(int)
-        # df['trend_confidence'] = (
-        #     np.sign(k_10) * r2_10 +
-        #     np.sign(k_30) * r2_30 +
-        #     np.sign(k_60) * r2_60
-        # )
+        k_10, r2_10 = rolling_lr_features(df['mid_price'].to_numpy(), window=10)
+        k_30, r2_30 = k, r2
+        k_60, r2_60 = rolling_lr_features(df['mid_price'].to_numpy(), window=60)
+        df['trend_align_10_30'] = (np.sign(k_10) == np.sign(k_30)).astype(int)
+        df['trend_align_30_60'] = (np.sign(k_30) == np.sign(k_60)).astype(int)
+        df['trend_confidence'] = (
+            np.sign(k_10) * r2_10 +
+            np.sign(k_30) * r2_30 +
+            np.sign(k_60) * r2_60
+        )
 
-        # df['mid_lr_k_10'] = k_10   # 斜率
-        # df['mid_lr_r2_10'] = r2_10   # 拟合优度
-        # df['mid_trend_strength_10'] = np.sign(k_10) * r2_10
+        df['mid_lr_k_10'] = k_10   # 斜率
+        df['mid_lr_r2_10'] = r2_10   # 拟合优度
+        df['mid_trend_strength_10'] = np.sign(k_10) * r2_10
         
-        # df['mid_lr_k_60'] = k_60   # 斜率
-        # df['mid_lr_r2_60'] = r2_60   # 拟合优度
-        # df['mid_trend_strength_60'] = np.sign(k) * r2
+        df['mid_lr_k_60'] = k_60   # 斜率
+        df['mid_lr_r2_60'] = r2_60   # 拟合优度
+        df['mid_trend_strength_60'] = np.sign(k) * r2
 
-        # # 盘口是否允许价格往某个方向动？
-        # df['price_move_capacity'] = df['mid_lr_k'] / (df['relative_spread'] + 1e-6)
-        # df['trend_liquidity_ratio'] = df['mid_trend_strength'] / (df['relative_spread'] + 1e-6)
+        # 盘口是否允许价格往某个方向动？
+        df['price_move_capacity'] = df['mid_lr_k'] / (df['relative_spread'] + 1e-6)
+        df['trend_liquidity_ratio'] = df['mid_trend_strength'] / (df['relative_spread'] + 1e-6)
 
         # 时间衰减盘口特征
         decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
@@ -356,17 +356,17 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
         df['mid_diff2'] = df['mid_diff1'].diff().fillna(0)   # 二阶差分：加速度
         
-        # # mid_diff1线性回归
-        # k, r2 = rolling_lr_features(df['mid_diff1'].to_numpy())
-        # df['mid_diff1_lr_k'] = k   # 斜率
-        # df['mid_diff1_lr_r2'] = r2   # 拟合优度
-        # df['mid_diff1_trend_strength'] = np.sign(k) * r2
+        # mid_diff1线性回归
+        k, r2 = rolling_lr_features(df['mid_diff1'].to_numpy())
+        df['mid_diff1_lr_k'] = k   # 斜率
+        df['mid_diff1_lr_r2'] = r2   # 拟合优度
+        df['mid_diff1_trend_strength'] = np.sign(k) * r2
 
-        # # mid_diff2线性回归
-        # k, r2 = rolling_lr_features(df['mid_diff2'].to_numpy())
-        # df['mid_diff2_lr_k'] = k   # 斜率
-        # df['mid_diff2_lr_r2'] = r2   # 拟合优度
-        # df['mid_diff2_trend_strength'] = np.sign(k) * r2
+        # mid_diff2线性回归
+        k, r2 = rolling_lr_features(df['mid_diff2'].to_numpy())
+        df['mid_diff2_lr_k'] = k   # 斜率
+        df['mid_diff2_lr_r2'] = r2   # 拟合优度
+        df['mid_diff2_trend_strength'] = np.sign(k) * r2
 
         extra_feats = {}
         # 价格冲击方向
@@ -402,7 +402,7 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         arr = np.ascontiguousarray(df.values.astype(np.float32))
         arrays.append(arr)
     
-    x_hat = np.stack(arrays, axis=0) # (N, 1994, D)
+    x_hat = np.stack(arrays, axis=0)   # (N, 1994, D)
     # print(f"x_hat shape after stacking is {x_hat.shape}")
     if N: # 训练时需要返回标签
         label = np.ascontiguousarray(label.values.astype(np.int8))

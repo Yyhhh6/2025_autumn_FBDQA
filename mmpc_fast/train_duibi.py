@@ -1,5 +1,5 @@
 from .model import XGBModel
-from .Predictor import preprocess
+from .Predictor import preprocess_local, preprocess_platform
 from .data_process import *
 import os
 import numpy as np
@@ -13,8 +13,8 @@ from tqdm import tqdm
 # EXCLUDE_FILES = ['./data/data_raw/snapshot_sym1_date33_pm.csv', './data/data_raw/snapshot_sym7_date42_am.csv', './data/data_raw/snapshot_sym1_date25_am.csv', './data/data_raw/snapshot_sym6_date32_pm.csv', './data/data_raw/snapshot_sym4_date33_pm.csv', './data/data_raw/snapshot_sym2_date59_pm.csv', './data/data_raw/snapshot_sym1_date26_pm.csv', './data/data_raw/snapshot_sym2_date59_am.csv', './data/data_raw/snapshot_sym2_date57_pm.csv', './data/data_raw/snapshot_sym4_date34_am.csv', './data/data_raw/snapshot_sym5_date38_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym1_date33_am.csv', './data/data_raw/snapshot_sym1_date34_pm.csv', './data/data_raw/snapshot_sym0_date63_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym7_date10_pm.csv', './data/data_raw/snapshot_sym4_date32_pm.csv', './data/data_raw/snapshot_sym6_date42_pm.csv', './data/data_raw/snapshot_sym4_date33_am.csv', './data/data_raw/snapshot_sym7_date42_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv', './data/data_raw/snapshot_sym2_date42_pm.csv', './data/data_raw/snapshot_sym4_date34_pm.csv', './data/data_raw/snapshot_sym1_date25_pm.csv', './data/data_raw/snapshot_sym5_date23_pm.csv', './data/data_raw/snapshot_sym6_date33_pm.csv', './data/data_raw/snapshot_sym4_date31_pm.csv', './data/data_raw/snapshot_sym7_date10_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv',]
 EXCLUDE_FILES = []
 
-TRAIN_RATIO = 0.9
-VAL_RATIO = 0.1
+TRAIN_RATIO = 1
+VAL_RATIO = 0.0
 SEED = 42
 
 # N_list = [5, 10, 20, 40, 60]
@@ -42,8 +42,8 @@ def split_csv_files(
     random.shuffle(csv_files)
 
     n = len(csv_files)
-    n_train = int(n * train_ratio)
-    n_val = int(n * val_ratio)
+    n_train = round(n * train_ratio)
+    n_val = round(n * val_ratio)
 
     train_files = csv_files[:n_train]
     val_files = csv_files[n_train:n_train + n_val]
@@ -56,19 +56,20 @@ def extract_feature(files_dir, N):
     csv_files = files_dir
     def process_file(file, N):
         if os.path.exists(file):
-            df = pd.read_csv(file)#[:-N]    # TODO: 
+            df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
-            df, labels = preprocess(df, N)
-            df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
-            # 去除前100个tick
-            labels = labels[99:]
-            df_list = df[99:]
+            df, labels = preprocess_platform(df, is_local=True)
+            print("df.shape: ", df.shape)  # df.shape:  (1880, 420)
         else:
             print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
-        return df_list, labels
+        
+        # print("len(df): ", len(df))
+        # print("len(labels): ", len(labels))
+        assert len(df) == len(labels), f"len(df): {len(df)}      len(labels): {len(labels)}"
+        return df, labels
 
     data = []
     labels_list = []
@@ -83,67 +84,79 @@ def extract_feature(files_dir, N):
 
     return data, labels_list
 
-def extract_feature_test(files_dir, N):
-    csv_files = files_dir
-    def process_file(file, N):
-        if os.path.exists(file):
-            df = pd.read_csv(file)#[:-N]
-            n_midprice = df['n_midprice'].values
-            if df.empty:
-                raise ValueError(f"File {file} is empty.")
-            df = df.reset_index(drop=True)
-            df, labels = preprocess(df, N)
-            df = df.squeeze(axis=0)
-            labels = labels[99:]
-            df_list = df[99:]
-            n_midprice = n_midprice[99:]
-        else:
-            print("file: ", file)
-            raise FileNotFoundError(f"File {file} not found.")
-        return df_list, labels, n_midprice
+def extract_feature_test(files_dir, N, is_local=True):
+    if is_local:
+        csv_files = files_dir
+        def process_file(file, N):
+            if os.path.exists(file):
+                df = pd.read_csv(file)#[:-N]
+                n_midprice = df['n_midprice'].values
+                if df.empty:
+                    raise ValueError(f"File {file} is empty.")
+                df = df.reset_index(drop=True)
+                df, labels = preprocess_local(df, N)
+                df = df.squeeze(axis=0)
+                labels = labels[99:]
+                df_list = df[99:]
+                n_midprice = n_midprice[99:]
+            else:
+                print("file: ", file)
+                raise FileNotFoundError(f"File {file} not found.")
+            return df_list, labels, n_midprice
 
-    data = []
-    labels_list = []
-    midprice_list = []
+        data = []
+        labels_list = []
+        midprice_list = []
 
-    for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
-        df, labels, n_midprice = process_file(file, N)
-        data.append(df)
-        labels_list.append(labels)
-        midprice_list.append(n_midprice)
-    data = np.concatenate(data, axis=0)
-    labels_list = np.concatenate(labels_list, axis=0)
-    # midprice_list = np.concatenate(midprice_list, axis=0)
+        for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
+            df, labels, n_midprice = process_file(file, N)
+            data.append(df)
+            labels_list.append(labels)
+            midprice_list.append(n_midprice)
+        data = np.concatenate(data, axis=0)
+        labels_list = np.concatenate(labels_list, axis=0)
 
-    return data, labels_list, midprice_list
+        return data, labels_list, midprice_list
+    else:
+        csv_files = files_dir
+        def process_file(file, N):
+            if os.path.exists(file):
+                df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
+                n_midprice = df['n_midprice'].values
+                if df.empty:
+                    raise ValueError(f"File {file} is empty.")
+                df = df.reset_index(drop=True)
+                df, labels = preprocess_platform(df, is_local=True)
+                df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
 
-# def process_file(file, N):
-#     if os.path.exists(file):
-#         df = pd.read_csv(file)#[:-N]
-#         print("raw df shape:", df.shape)
-#         if df.empty:
-#             raise ValueError(f"File {file} is empty.")
-        
-#         df = df.reset_index(drop=True)
-#         df, labels = preprocess(df, N)
-#         print("after preprocess df shape:", df.shape)
-#         print("after preprocess labels shape:", labels.shape)
+                # 去除前100个tick（preprocess中已经去过）
+                # labels = labels[99:]
+                # df_list = df[99:]
+                n_midprice = n_midprice[99:]
+            else:
+                print("file: ", file)
+                raise FileNotFoundError(f"File {file} not found.")
+            
+            assert len(df) == len(labels), f"len(df): {len(df)}      len(labels): {len(labels)}"
+            assert len(df) == len(n_midprice), f"len(df): {len(df)}      len(n_midprice): {len(n_midprice)}"
+            return df, labels, n_midprice
 
-#         df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
-#         print("after squeeze df shape:", df.shape)
+        data = []
+        labels_list = []
+        midprice_list = []
 
-#         # 去除前100个tick
-#         labels = labels[99:]
-#         df_list = df[99:]
-#         print("after cut 99 df shape:", df_list.shape)
-#         print("after cut 99 labels shape:", labels.shape)
-#     else:
-#         print("file: ", file)
-#         raise FileNotFoundError(f"File {file} not found.")
-#     return df_list, labels
+        for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
+            df, labels, n_midprice = process_file(file, N)
+            data.append(df)
+            labels_list.append(labels)
+            midprice_list.append(n_midprice)
+        data = np.concatenate(data, axis=0)
+        labels_list = np.concatenate(labels_list, axis=0)
 
-def test(test_files, N, model):
-    test_data, test_labels, n_midprice = extract_feature_test(files_dir=test_files, N=N)
+        return data, labels_list, midprice_list
+
+def test(test_files, N, model, is_local=True):
+    test_data, test_labels, n_midprice = extract_feature_test(files_dir=test_files, N=N, is_local=is_local)
     # print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
     print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}")
     # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
@@ -162,30 +175,29 @@ def test(test_files, N, model):
         signal = np.argmax(y_pred, axis=1)
         signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
         y = signal
-        # signal = y_pred
-        # y = y_pred
         print(f"y shape: {y.shape}, test_labels shape: {test_labels.shape}")
         from sklearn.metrics import classification_report, precision_score, recall_score, fbeta_score
         print(f"Results for N={N}:")
-        # print(classification_report(test_labels, y, digits=4))
+
         # Recall：真实上涨/下跌中，被预测正确的比例
         index_recall = test_labels != 1
         print("index_recall: ", index_recall)
         recall = sum(y[index_recall] == test_labels[index_recall]) / sum(index_recall)
+
         # Precision：预测上涨/下跌中，预测正确的比例
         index_precision = y != 1
         precision = sum(y[index_precision] == test_labels[index_precision]) / sum(index_precision)
         beta = 0.5
         f05 = (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
+
         print(f"Precision: {precision:.4f}")
         print(f"Recall:    {recall:.4f}")
         print(f"F0.5:      {f05:.4f}")
+
         pnl = []
-
-        # print("len(n_midprice): ", len(n_midprice))
-
         start = 0
         j = 0
+
         for i in range(len(n_midprice)):
             length = len(n_midprice[i])
             for j in range(length):
@@ -196,20 +208,6 @@ def test(test_files, N, model):
                 elif signal[j+start] == 0:    # Short
                     pnl.append(n_midprice[i][j] - n_midprice[i][j+N])
             start += length
-            
-        # print("****************start*******************: ", start)
-        # exit(0)
-
-        # for i, s in enumerate(signal):
-        #     if i + N >= len(n_midprice):
-        #         # pnl.append(0)
-        #         continue
-        #     if s == 2:      # Long
-        #         pnl.append(n_midprice[i+N] - n_midprice[i])
-        #     elif s == 0:    # Short
-        #         pnl.append(n_midprice[i] - n_midprice[i+N])
-        #     # else:           # Hold
-        #     #     pnl.append(0)
 
         pnl = np.array(pnl)
         total_pnl = pnl.sum()
@@ -243,8 +241,8 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym0_train", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_ZZZ_sym0/", help="save_path")
+    parser.add_argument("--file_dir", type=str, default="./data/data_test", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models_ZZZ/", help="save_path")
 
     args = parser.parse_args()
 
@@ -313,6 +311,7 @@ if __name__ == "__main__":
         ]
         print("test_files2: ", test_files2)
         # test(test_files, N=N, model=model)
-        test(test_files2, N=N, model=model)
+        test(test_files2, N=N, model=model, is_local=True)
+        test(test_files2, N=N, model=model, is_local=False)
     
     print("\n\n\n")
