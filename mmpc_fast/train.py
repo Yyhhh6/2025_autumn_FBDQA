@@ -298,9 +298,10 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_ZZZ/model_20_all_20251231_025526.json")
-        # data_dir = "data/data_sym_test"
-        data_dir = "data/data_sym0_test_select"
+        # model = XGBModel("models_ZZZ_0/model_20_all_20251231_165909.json")
+        data_dir = "data/data_sym_test"
+        # data_dir = "data/data_sym0_test"
+        # data_dir = "data/data_sym0_test_select"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
@@ -311,6 +312,6 @@ if __name__ == "__main__":
 
         test(test_files2, N=N, model=model)   # 本地最快评测
         test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
-        # test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
+        test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")

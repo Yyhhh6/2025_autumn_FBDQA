@@ -1,1 +1,1 @@
-zip -r qyh_fast.zip qyh_fast/
+zip -r qyh_fastest.zip qyh_fast/
