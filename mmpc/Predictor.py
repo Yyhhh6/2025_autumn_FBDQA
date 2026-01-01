@@ -4,22 +4,56 @@ import pandas as pd
 import numpy as np
 from .model import XGBModel
 from .data_process import assign_tick_time_labels, data_scale_Z_Score
+import json, re
 
 class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
-        # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
-        self.model = self.load_model(pth_path)
-        print(f"model loaded from {pth_path}")
+        # pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
+        # # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
+        # self.model = self.load_model(pth_path)
+        # print(f"model loaded from {pth_path}")
+
+        with open(os.path.join(os.path.dirname(__file__),"model_config.json"), "r") as f:
+            config = json.load(f)
+        self.target_confidence = {}
+        self.models = {}
+
+        for i in range(10):
+            sym = f"sym{i}"
+            self.target_confidence[i] = config[sym]["best_confidence"]
+            # path_dir = os.path.join(os.path.dirname(__file__), "models_"+sym)
+            # model_path = os.listdir(path_dir)[-1]
+            # self.models[i] = XGBModel(os.path.join(path_dir, model_path))
         
+        pattern = re.compile(r"model_.*_sym(\d+)_.*\.json")
+        for filename in os.listdir(os.path.dirname(__file__)):
+            match = pattern.search(filename)
+            if match:
+                # 提取索引 i
+                index = int(match.group(1))
+                file_path = os.path.join(os.path.dirname(__file__), filename)
+                
+                # 加载逻辑
+                try:
+                    self.models[index] = XGBModel(file_path)
+                    print(f"成功加载模型: {filename} -> models[{index}]")
+                except Exception as e:
+                    print(f"加载 {filename} 出错: {e}")
+
+        # 查看加载结果
+        print(f"已加载的模型索引: {list(self.models.keys())}")
+
+
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
         # 对输入数据进行预处理
+        model = self.models[int(x[0]['sym'].iloc[0])] # 由于一个list中sym一样
+        confidence = self.target_confidence[int(x[0]['sym'].iloc[0])]
         print(f"Received {len(x)} dataframes for prediction.")
         x_hat = self.preprocess(x)
         y = []
-        y_pred = self.model.predict(x_hat)   # (N, 3)
+        y_pred = model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
         signal[confidence < 0.6] = 1 # 信心不足时，预测为不变
@@ -35,7 +69,7 @@ class Predictor():
         return XGBModel(model_path)
 
     def preprocess(self, x: Union[List[pd.DataFrame], pd.DataFrame]):
-        return preprocess(x)
+        return preprocess(x, N=20, is_train=False)
 
 def rolling_lr_k_r2(y: np.ndarray):
     if len(y) < 2:
@@ -88,7 +122,7 @@ def time_fixed_sample(df, cols, lags=[1, 2, 3, 4, 5, 10, 20, 30, 40, 60]):
 
     return df
 
-def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
+def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None, is_train=False):
     """
     更改 preprocess 逻辑，适用于公榜评测的更快推理
     """
@@ -116,8 +150,9 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         # 'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
         # 'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
         # 'mid_diff2_lr_k', 'mid_diff2_lr_r2', 'mid_diff2_trend_strength',
-        # 'trend_regime', 'trend_strength_gated', 
-        # 'price_move_capacity', 'trend_liquidity_ratio'
+        'trend_regime', 'trend_strength_gated', 
+        'price_move_capacity', 'trend_liquidity_ratio', 
+        'voi', 'buy_burning', 'sell_burning', 'vol_std_ratio', 'mid_skew'
     ]
 
     lags2=[1, 2, 3, 4, 5, 10, 15, 20]
@@ -140,11 +175,11 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         x = [x]
 
     if N: # 训练时需要返回标签
-        labels = []
-        for df in x:
-            labels.append(df['label_20'])
-            # print("df['label_20'] shape: ", df['label_20'].shape)
-        label = pd.concat(labels, axis=0).reset_index(drop=True)
+        label = np.concatenate([df[f'label_{N}'].values for df in x], axis=0).astype(np.int8)
+        label = np.ascontiguousarray(label)
+        profit = np.concatenate([(df['n_midprice'].shift(-N) - df['n_midprice']).fillna(0).values for df in x], axis=0).astype(np.float32)
+        profit = np.ascontiguousarray(profit) # 现在如果买入，N步后盈利多少
+
         # print("label shape:", label.shape)
 
     for i, df in enumerate(x):
@@ -365,7 +400,32 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         # df['mid_diff2_lr_k'] = k   # 斜率
         # df['mid_diff2_lr_r2'] = r2   # 拟合优度
         # df['mid_diff2_trend_strength'] = np.sign(k) * r2
+        
+        # 对sym1
+        # 1. 订单流有效增量 (VOI)
+        def calc_voi(df):
+            bid_change = np.where(df['n_bid1'] > df['n_bid1'].shift(1), df['n_bsize1'],
+                        np.where(df['n_bid1'] < df['n_bid1'].shift(1), 0, 
+                                df['n_bsize1'] - df['n_bsize1'].shift(1)))
+            ask_change = np.where(df['n_ask1'] < df['n_ask1'].shift(1), df['n_asize1'],
+                        np.where(df['n_ask1'] > df['n_ask1'].shift(1), 0, 
+                                df['n_asize1'] - df['n_asize1'].shift(1)))
+            return pd.Series(bid_change - ask_change).fillna(0)
+        df['voi'] = calc_voi(df)
+        # 2. 账簿消耗率 (Book Burning)
+        # 衡量成交量相对于盘口挂单的穿透力
+        df['buy_burning'] = df['amount_delta'] / (df['n_asize1'] + 1e-6)
+        df['sell_burning'] = df['amount_delta'] / (df['n_bsize1'] + 1e-6)
 
+        # 3. 波动率激增 (Relative Volatility)
+        # 暴涨前夕通常伴随波动率突破
+        df['vol_std_ratio'] = df['mid_diff1'].rolling(20).std() / df['mid_diff1'].rolling(100).std()
+
+        # 4. 偏度与峰度 (Higher Moments)
+        # 捕捉分布的极端长尾（即暴涨暴跌）
+        df['mid_skew'] = df['mid_diff1'].rolling(40).skew()
+ 
+ 
         extra_feats = {}
         # 价格冲击方向
         extra_feats['trade_impact'] = df['mid_diff1'] * df['amount']
@@ -389,11 +449,16 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
 
         lag_cols1 = [f'{c}_lag{lag}' for c in raw_cols1 for lag in lags1]
         lag_cols2 = [f'{c}_lag{lag}' for c in raw_cols2 for lag in lags2]
+        
+        # print(f"df['profit_after_{N}'] shape: ", df[f'profit_after_{N}'].shape)
+        # print(f"profit前五个数和后十个数", df[f'profit_after_{N}'].head(), df[f'profit_after_{N}'].tail(10))
         final_columns = (
             new_columns
             + lag_cols1
             + lag_cols2
         )
+        
+
         x[i] = df[final_columns]
 
     for df in x:
@@ -401,10 +466,13 @@ def preprocess(x: Union[List[pd.DataFrame], pd.DataFrame], N=None):
         arrays.append(arr)
     
     x_hat = np.stack(arrays, axis=0) # (N, 1994, D)
+    # print(f"转化为numpy数组后x_hat的shape: {x_hat[0,:5,-1]}, {x_hat[0,-10:,-1]}")
     # print(f"x_hat shape after stacking is {x_hat.shape}")
     if N: # 训练时需要返回标签
-        label = np.ascontiguousarray(label.values.astype(np.int8))
-        return x_hat, label
+        return x_hat, label, profit
 
     x_hat = x_hat[:, -1, :]
     return x_hat
+
+if __name__ == "__main__":
+    predictor = Predictor()

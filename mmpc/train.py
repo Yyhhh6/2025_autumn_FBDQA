@@ -60,28 +60,31 @@ def extract_feature(files_dir, N):
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
-            df, labels = preprocess(df, N)
+            df, labels, profits = preprocess(df, N)
             df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
             # 去除前100个tick
             labels = labels[99:]
             df_list = df[99:]
+            profits = profits[99:]
         else:
             print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
-        return df_list, labels
+        return df_list, labels, profits
 
     data = []
     labels_list = []
-
+    profits_list = []
     for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
-        df, labels = process_file(file, N)
+        df, labels, profits = process_file(file, N)
         data.append(df)
         labels_list.append(labels)
+        profits_list.append(profits)
 
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
+    profits_list = np.concatenate(profits_list, axis=0)
 
-    return data, labels_list
+    return data, labels_list, profits_list
 
 def extract_feature_test(files_dir, N):
     csv_files = files_dir
@@ -92,7 +95,7 @@ def extract_feature_test(files_dir, N):
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
-            df, labels = preprocess(df, N)
+            df, labels, _ = preprocess(df, N)
             df = df.squeeze(axis=0)
             labels = labels[99:]
             df_list = df[99:]
@@ -154,7 +157,8 @@ def test(test_files, N, model):
 
     # print("y_pred.shape: ", y_pred.shape)
 
-    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    target_confidences = np.arange(0.3, 1., 0.025).tolist()
+    # target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     # target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
@@ -228,9 +232,10 @@ def test(test_files, N, model):
         print(f"Trades:      {num_trades}")
         print(f"Win Rate:    {win_rate:.3f}")
         print(f"Final Score:    {final_score:.3f}")
-
+# python -m mmpc.train --weight1 1.0 --weight2 0.5 --weight3 1.0 --max_depth 3 --subsample 0.6 --colsample_bytree 0.48 --min_child_weight 18 --gamma 4.3 --sym 0 --file_dir ./data/data_sym0_train
 if __name__ == "__main__":
     import argparse
+    import shutil
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
     parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
     parser.add_argument("--weight1", type=float, default=1.5, help="Weight 1 for custom loss")
@@ -246,6 +251,8 @@ if __name__ == "__main__":
     parser.add_argument("--file_dir", type=str, default="./data/data_sym0_train", help="file_dir")
     parser.add_argument("--save_path", type=str, default="./models_ZZZ_sym0/", help="save_path")
 
+    parser.add_argument("--sym", type=str, default="all", help="sym identifier")
+    parser.add_argument("--penalty_scale", type=float, default=5.0, help="penalty_scale for custom loss")
     args = parser.parse_args()
 
     # 打印参数
@@ -261,10 +268,12 @@ if __name__ == "__main__":
     print(f"gamma: {args.gamma}")
     print(f"file_dir: {args.file_dir}")
     print(f"save_path: {args.save_path}")
+    print(f"sym: {args.sym}")
+    print(f"penalty_scale: {args.penalty_scale}")
     print("===============================")
 
     for N in N_list:
-        # 划分训练集、验证集、测试集
+        # # 划分训练集、验证集、测试集
         train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
         print("train_files: ", train_files)
@@ -273,10 +282,10 @@ if __name__ == "__main__":
         # exit(0)
 
         # 提取训练集、验证集、测试集的特征
-        train_data, train_labels = extract_feature(files_dir=train_files, N=N)
-        val_data, val_labels = extract_feature(files_dir=val_files, N=N)
+        train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
+        val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
 
-        print("train_data.shape: ", train_data.shape)
+        # print(f"最后一列为0的值的数目: {(train_data[:,-1]==0).sum()}")
         
         model = XGBModel()
         model.train(
@@ -296,15 +305,24 @@ if __name__ == "__main__":
             min_child_weight=args.min_child_weight,
             gamma=args.gamma,
             save_path=args.save_path,
-            # sym: str = "all",
+            sym=args.sym,
+            penalty_scale=args.penalty_scale,
+            train_profits=train_profits
         )
-
+        if hasattr(model, 'save_model_path'):
+            final_path = model.save_model_path
+            # 建立 sym 目录，例如 ./models_all/sym0/best_model.json
+            standard_dir = os.path.join(args.save_path, f"sym{args.sym}")
+            os.makedirs(standard_dir, exist_ok=True)
+            shutil.copy(final_path, os.path.join(standard_dir, "best_model.json"))
+            print(f"Standardized model for sym{args.sym} saved to {standard_dir}/best_model.json")
+    
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
         # model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
-        data_dir = "data/data_sym0_test"
+        data_dir = f"data/data_sym{args.sym}_test"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
