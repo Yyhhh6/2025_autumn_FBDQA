@@ -21,12 +21,12 @@ def pnl_weighted_softmax_obj(preds, dtrain, profit_train=None, penalty_scale=5.0
     # 3. 构造基于 Profit 的惩罚因子
     # 使用 abs(profit) 并进行简单的标准化/缩放，避免梯度爆炸
     # 也可以使用 np.log1p(np.abs(profit))
-    abs_profit = np.abs(profit_train)
-    profit_weight = 1.0 + penalty_scale * abs_profit 
+    # abs_profit = np.abs(profit_train)
+    # profit_weight = 1.0 + penalty_scale * abs_profit 
 
     # 5. 组合权重：类别权重 * 收益惩罚权重
     class_weight = np.array([weight1, weight2, weight3])
-    final_weight = class_weight[y][:, None] * profit_weight[:, None]
+    final_weight = class_weight[y][:, None] #* profit_weight[:, None]
 
     # 应用权重到梯度
     grad *= final_weight

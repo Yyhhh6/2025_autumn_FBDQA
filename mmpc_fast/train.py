@@ -261,8 +261,8 @@ if __name__ == "__main__":
     print(f"gamma: {args.gamma}")
     print(f"file_dir: {args.file_dir}")
     print(f"save_path: {args.save_path}")
-    print(f"sym: {args.sym}")
-    print(f"penalty_scale: {args.penalty_scale}")
+    # print(f"sym: {args.sym}")
+    # print(f"penalty_scale: {args.penalty_scale}")
     print("===============================")
 
     for N in N_list:
@@ -297,9 +297,9 @@ if __name__ == "__main__":
             min_child_weight=args.min_child_weight,
             gamma=args.gamma,
             save_path=args.save_path,
-            sym = args.sym,
-            penalty_scale=args.penalty_scale,
-            profit_train=train_profits
+            # sym = args.sym,
+            # penalty_scale=args.penalty_scale,
+            # profit_train=train_profits
         )
 
         print("*"*50)
