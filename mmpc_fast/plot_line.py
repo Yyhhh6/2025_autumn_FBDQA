@@ -2,7 +2,7 @@ from .data_process import *
 from .model import XGBModel
 # from .test import extract_feature
 import os
-from .Predictor import preprocess
+from .Predictor import preprocess_local as preprocess
 import os
 import numpy as np
 import pandas as pd
@@ -20,13 +20,14 @@ def extract_feature(files_dir, N):
             df = df.reset_index(drop=True)
             df, labels, _ = preprocess(df, N)
             df = df.squeeze(axis=0)
-            labels = labels[99:]
-            df_list = df[99:]
+            # labels = labels[99:]
+            # df_list = df[99:]
             n_midprice = n_midprice[99:]
+            amount_delta = amount_delta[99:]
         else:
             print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
-        return df_list, labels, n_midprice, amount_delta
+        return df, labels, n_midprice, amount_delta
 
     data = []
     labels_list = []
@@ -62,62 +63,63 @@ signal[confidence < 0.65] = 1
 import matplotlib.pyplot as plt
 import numpy as np
 
-def plot_prediction_results(mid_prices, signals, labels, start_idx=0, length=500):
+def plot_prediction_results(mid_prices, amount_deltas, signals, labels, start_idx=0, length=500):
     """
-    mid_prices: 原始中间价序列 (n_midprice)
-    signals: 模型生成的预测信号 (0:下, 1:平, 2:上)
-    labels: 真实标签 (0:下, 1:平, 2:上)
+    mid_prices: 原始中间价序列
+    amount_deltas: 成交量变化序列
     """
-    # 截取特定窗口的数据
+    # 合并列表为 numpy 数组
     mid_prices = np.concatenate(mid_prices, axis=0)
+    amount_deltas = np.concatenate(amount_deltas, axis=0)
 
-    # end_idx = len(mid_prices)
-    end_idx = 6000
-    start_idx = 4000
+    end_idx = min(start_idx + length, len(mid_prices))
+    
     prices = mid_prices[start_idx:end_idx]
+    deltas = amount_deltas[start_idx:end_idx]
     preds = signals[start_idx:end_idx]
     actuals = labels[start_idx:end_idx]
-    x = np.arange(len(prices))+start_idx
+    x = np.arange(len(prices)) + start_idx
 
-    plt.figure(figsize=(15, 7))
-    plt.plot(x, prices, color='black', alpha=0.3, label='Mid Price', linewidth=1)
+    fig, ax1 = plt.subplots(figsize=(15, 7))
 
-    # 定义标记形状：上涨用上三角，下跌用下三角
-    # 定义颜色逻辑：预测正确为绿，预测错误为红
-    
+    # --- 绘制 Price (左轴) ---
+    ax1.plot(x, prices, color='black', alpha=0.3, label='Mid Price', linewidth=1)
+    ax1.set_xlabel("Ticks")
+    ax1.set_ylabel("Price", color='black')
+    ax1.grid(True, alpha=0.2)
+
+    # --- 绘制 Amount Delta (右轴) ---
+    ax2 = ax1.twinx()  
+    # 使用填充区域或柱状图更能区分成交量，这里使用 alpha 较低的浅蓝色
+    ax2.fill_between(x, deltas, color='blue', alpha=0.1, label='Amount Delta')
+    ax2.set_ylabel("Amount Delta", color='blue')
+    # 限制右轴范围，避免遮挡主要信号点（可选）
+    # ax2.set_ylim(min(deltas)*1.5, max(deltas)*1.5) 
+
+    # --- 绘制预测信号 (在 ax1 价格曲线上) ---
     for i in range(len(preds)):
-        # 只观察预测了上涨(2)或下跌(0)的点，忽略预测为“不变(1)”的点
-        if preds[i] == 1:
-            continue
-            
+        if preds[i] == 1: continue
         color = 'green' if preds[i] == actuals[i] else 'red'
         marker = '^' if preds[i] == 2 else 'v'
-        # if i + start_idx < 5000 and i + start_idx > 1800:  
-            # 仅打印部分点的信息，避免信息过载
-        print(f"Tick {start_idx + i}: Price={prices[i]:.4f}, Predicted={preds[i]}, Actual={actuals[i]}, Color={color}, Marker={marker}, x={x[i]}, y={prices[i]}")
-        print(f"1 ticks price change: {mid_prices[start_idx + i + 1] - mid_prices[start_idx + i]:.4f}")
-        print(f"20 ticks price change: {mid_prices[start_idx + i + 20] - mid_prices[start_idx + i]:.4f}")
-        print("-----")
-        
-        plt.scatter(x[i], prices[i], color=color, marker=marker, s=50, alpha=0.8)
+        ax1.scatter(x[i], prices[i], color=color, marker=marker, s=50, alpha=0.8, zorder=3)
 
-    # 制作图例
+    # 合并图例
     from matplotlib.lines import Line2D
-    custom_lines = [Line2D([0], [0], color='black', lw=1, alpha=0.3),
-                    Line2D([0], [0], marker='^', color='w', markerfacecolor='green', markersize=10),
-                    Line2D([0], [0], marker='v', color='w', markerfacecolor='red', markersize=10)]
+    custom_lines = [
+        Line2D([0], [0], color='black', lw=1, alpha=0.3),
+        Line2D([0], [0], color='blue', lw=4, alpha=0.2), # 代表 amount_delta
+        Line2D([0], [0], marker='^', color='w', markerfacecolor='green', markersize=10),
+        Line2D([0], [0], marker='v', color='w', markerfacecolor='red', markersize=10)
+    ]
+    ax1.legend(custom_lines, ['Mid Price', 'Amount Delta', 'Correct Prediction', 'Wrong Prediction'], loc='upper left')
     
-    plt.legend(custom_lines, ['Mid Price', 'Correct Prediction', 'Wrong Prediction'])
-    plt.title(f"Model Predictions vs Actual Movements (Ticks {start_idx} to {end_idx})")
-    plt.xlabel("Ticks")
-    plt.ylabel("Price")
-    plt.grid(True, alpha=0.2)
+    plt.title(f"Price & Amount Delta with Predictions (Ticks {start_idx} to {end_idx})")
+    plt.tight_layout()
     plt.show()
-    plt.savefig("mmpc/amount_delta.png", dpi=300)
-
+    plt.savefig("analysis_plot.png", dpi=300)
 # 调用函数进行绘图（假设 n_midprice, signal, test_labels 已经准备好）
 # 注意：确保 mid_price 的长度与 signal 一致
-plot_prediction_results(amount_delta, signal, test_labels, start_idx=1000, length=500)
+plot_prediction_results(n_midprice, amount_delta, signal, test_labels, start_idx=0, length=5000)
 
 index_recall = test_labels != 1
 recall = sum(signal[index_recall] == test_labels[index_recall]) / sum(index_recall)

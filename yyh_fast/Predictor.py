@@ -33,10 +33,14 @@ class Predictor():
                 # 提取索引 i
                 index = int(match.group(1))
                 file_path = os.path.join(os.path.dirname(__file__), filename)
-                
+                # print(f"index is {index}, file_path is {file_path}")
                 # 加载逻辑
                 try:
                     self.models[index] = XGBModel(file_path)
+                    # with open(file_path, 'r') as f:
+                    #     model_json = json.load(f)
+                    # num_feature = model_json.get('learner', {}).get('learner_model_param', {}).get('num_feature')
+                    # print("模型配置中记录的特征数:", num_feature)
                     print(f"成功加载模型: {filename} -> models[{index}]")
                 except Exception as e:
                     print(f"加载 {filename} 出错: {e}")
@@ -47,11 +51,15 @@ class Predictor():
     def predict(self, x: List[pd.DataFrame]) -> List[List[int]]:
         # 对输入数据进行预处理
         print(f"Received {len(x)} dataframes for prediction.")
+        sym_id = int(x[-1]['sym'].iloc[0])
+        batch_size = len(x)
+        model = self.models[sym_id]
+        target_confidence = self.target_confidence[sym_id]
+
         x_hat = self.preprocess(x)
 
         y = []
-        target_confidence = 0.75
-        y_pred = self.model.predict(x_hat)   # (N, 3)
+        y_pred = model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
         signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
@@ -180,11 +188,45 @@ def compare_dfs(df1, df2, tol=1e-5):
         return diff_df
     return None
 
+def extract_features_by_sym(sym: int, df: pd.DataFrame, return_dict=False):
+    new_feature_names = []
+    assert isinstance(df, pd.DataFrame), "Expected pd.DataFrame input"
+    
+    if sym == 1:
+        # 1. VOI (Volume Order Imbalance) - 极致简化版逻辑
+        # 计算价格变动方向：1 (涨), -1 (跌), 0 (平)
+        b_diff = np.sign(df['n_bid1'].diff().fillna(0))
+        a_diff = np.sign(df['n_ask1'].diff().fillna(0))
+        
+        # 根据价格变动逻辑直接计算量变
+        # 价格升：用当前量；价格平：用量差；价格跌：0
+        voi_bid = np.where(b_diff > 0, df['n_bsize1'], np.where(b_diff < 0, 0, df['n_bsize1'].diff()))
+        voi_ask = np.where(a_diff < 0, df['n_asize1'], np.where(a_diff > 0, 0, df['n_asize1'].diff()))
+        df['voi'] = np.nan_to_num(voi_bid - voi_ask, nan=0.0)
+
+        # 2. 账簿消耗率 (Book Burning)
+        df['buy_burning'] = df['amount_delta'] / (df['n_asize1'] + 1e-6)
+        df['sell_burning'] = df['amount_delta'] / (df['n_bsize1'] + 1e-6)
+
+        # 3. 波动率激增 (Relative Volatility)
+        m_diff = df['mid_diff1']
+        df['vol_std_ratio'] = m_diff.rolling(20).std() / m_diff.rolling(100).std()
+
+        # 4. 偏度 (Skewness)
+        df['mid_skew'] = m_diff.rolling(40).skew()
+
+        new_feature_names = ['voi', 'buy_burning', 'sell_burning', 'vol_std_ratio', 'mid_skew']
+
+    # 将新计算的列更新回字典并返回
+    if return_dict:
+        return df[new_feature_names].to_dict(orient='records')[-1] if len(new_feature_names) > 0 else {}
+    return df, new_feature_names
 
 def preprocess_slice(x: list[pd.DataFrame]):
     # 只处理 100 个tick
     x_extract = []
     # print("len(x): ", len(x))
+    sym = int(x[0]['sym'].iloc[0]) # 一个batch的数据，sym都是一样的
     lags1=[1, 2, 5, 10, 20, 50]
     lags2=[1, 2, 5]
     lags3=[1]
@@ -366,6 +408,9 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
             lag_feats.update(feat_dict)
 
+        sym_features = extract_features_by_sym(sym, df, return_dict=True)
+        lag_feats.update(sym_features)
+
         x_extract.append(lag_feats)
 
     # concat_df = pd.DataFrame(x_extract)
@@ -491,12 +536,15 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     
     if isinstance(x, pd.DataFrame):
         x = [x]
-
+    sym = int(x[0]['sym'].iloc[0]) # 一个batch的数据，sym都是一样的
     if is_train: # 训练时需要返回标签
         labels = []
+        profits = []
         for df in x:
             labels.append(df['label_20'][99:])
+            profits.append((df['n_midprice'].shift(-20) - df['n_midprice']).fillna(0)[99:])
         label = pd.concat(labels, axis=0).reset_index(drop=True)
+        profit = pd.concat(profits, axis=0).reset_index(drop=True)
 
     # 带进度条
     for i, df in tqdm(
@@ -705,10 +753,13 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
 
         df = time_fixed_sample(df, raw_cols3, lags=lags3)
         df = df.copy()
+        
+        df, new_feature_names = extract_features_by_sym(sym, df, return_dict=False)
 
         lag_cols = [f'{c}_lag{lag}' for c in raw_cols1 for lag in lags1] \
                  + [f'{c}_lag{lag}' for c in raw_cols2 for lag in lags2] \
-                 + [f'{c}_lag{lag}' for c in raw_cols3 for lag in lags3]
+                 + [f'{c}_lag{lag}' for c in raw_cols3 for lag in lags3] \
+                 + new_feature_names
         arr = np.ascontiguousarray(df[lag_cols].values.astype(np.float32))
         arrays.append(arr)
 
@@ -730,6 +781,9 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     concat_df = concat_df[sorted(concat_df.columns)]
 
     if is_train:
-        return concat_df, label
+        return concat_df, label, profit
     else:
         return concat_df
+    
+if __name__ == "__main__":
+    Predictor()

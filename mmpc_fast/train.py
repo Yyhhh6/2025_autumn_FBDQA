@@ -60,27 +60,30 @@ def extract_feature(files_dir, N):
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
-            df, labels = preprocess_local(df, is_train=True)
-            print("df.shape: ", df.shape)  # df.shape:  (1880, 420)
+            df, labels, profits = preprocess_local(df, is_train=True)
+            # print("df.shape: ", df.shape)  # df.shape:  (1880, 420)
         else:
             print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
         
         assert len(df) == len(labels), f"len(df): {len(df)}      len(labels): {len(labels)}"
-        return df, labels
+        return df, labels, profits
 
     data = []
     labels_list = []
+    profits_list = []
 
     for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
-        df, labels = process_file(file, N)
+        df, labels, profits = process_file(file, N)
         data.append(df)
         labels_list.append(labels)
+        profits_list.append(profits)
 
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
+    profits_list = np.concatenate(profits_list, axis=0)
 
-    return data, labels_list
+    return data, labels_list, profits_list
 
 def extract_feature_test(files_dir, N, is_local=True, is_slice=False):
     if is_slice==False:
@@ -92,7 +95,7 @@ def extract_feature_test(files_dir, N, is_local=True, is_slice=False):
                 if df.empty:
                     raise ValueError(f"File {file} is empty.")
                 df = df.reset_index(drop=True)
-                df, labels = preprocess_local(df, is_train=True)
+                df, labels, _ = preprocess_local(df, is_train=True)
 
                 n_midprice = n_midprice[99:]
             else:
@@ -239,8 +242,11 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_ZZZ_0/", help="save_path")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models_ZZZ_1/", help="save_path")
+
+    parser.add_argument("--sym", type=str, default="all", help="sym identifier")
+    parser.add_argument("--penalty_scale", type=float, default=5.0, help="penalty_scale for custom loss")
 
     args = parser.parse_args()
 
@@ -257,6 +263,8 @@ if __name__ == "__main__":
     print(f"gamma: {args.gamma}")
     print(f"file_dir: {args.file_dir}")
     print(f"save_path: {args.save_path}")
+    print(f"sym: {args.sym}")
+    print(f"penalty_scale: {args.penalty_scale}")
     print("===============================")
 
     for N in N_list:
@@ -268,8 +276,8 @@ if __name__ == "__main__":
         print("test_files: ", test_files)
 
         # 提取训练集、验证集、测试集的特征
-        train_data, train_labels = extract_feature(files_dir=train_files, N=N)
-        val_data, val_labels = extract_feature(files_dir=val_files, N=N)
+        train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
+        val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
 
         print("train_data.shape: ", train_data.shape)
         
@@ -291,7 +299,9 @@ if __name__ == "__main__":
             min_child_weight=args.min_child_weight,
             gamma=args.gamma,
             save_path=args.save_path,
-            # sym: str = "all",
+            sym = args.sym,
+            penalty_scale=args.penalty_scale,
+            profit_train=train_profits
         )
 
         print("*"*50)
@@ -311,7 +321,7 @@ if __name__ == "__main__":
         print("test_files2: ", test_files2)
 
         test(test_files2, N=N, model=model)   # 本地最快评测
-        test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
-        test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
+        # test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
+        # test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")

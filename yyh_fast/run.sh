@@ -5,6 +5,19 @@ CONFIG_FILE="./base_model_config.json"
 # 使用 Python 提取所有的 sym 键名
 SYMS=$(python3 -c "import json; print(' '.join(json.load(open('$CONFIG_FILE')).keys()))")
 # SYMS=${SYMS#*sym6 }
+
+DIRS=("logs" "models")
+
+for DIR in "${DIRS[@]}"; do
+    if [ -d "$DIR" ]; then
+        echo "Cleaning existing directory: $DIR"
+        rm -rf "$DIR"/*
+    else
+        echo "Creating directory: $DIR"
+        mkdir -p "$DIR"
+    fi
+done
+
 for SYM in $SYMS; do
     echo "--------------------------------------------------"
     echo "Starting training for $SYM..."

@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_001637.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -466,9 +466,12 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
 
     if is_train: # 训练时需要返回标签
         labels = []
+        profits = []
         for df in x:
             labels.append(df['label_20'][99:])
+            profits.append((df['n_midprice'].shift(-20) - df['n_midprice']).fillna(0)[99:])
         label = pd.concat(labels, axis=0).reset_index(drop=True)
+        profit = pd.concat(profits, axis=0).reset_index(drop=True)
 
     # 带进度条
     for i, df in tqdm(
@@ -702,6 +705,6 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     concat_df = concat_df[sorted(concat_df.columns)]
 
     if is_train:
-        return concat_df, label
+        return concat_df, label, profit
     else:
         return concat_df
