@@ -243,10 +243,8 @@ if __name__ == "__main__":
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
     parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_ZZZ_1/", help="save_path")
-
-    parser.add_argument("--sym", type=str, default="all", help="sym identifier")
-    parser.add_argument("--penalty_scale", type=float, default=5.0, help="penalty_scale for custom loss")
+    # parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models_Z/", help="save_path")
 
     args = parser.parse_args()
 
@@ -308,7 +306,7 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_ZZZ_0/model_20_all_20251231_165909.json")
+        # model = XGBModel("models_ZZZ_Penalty/model_20_all_20260102_024253.json")
         data_dir = "data/data_sym_test"
         # data_dir = "data/data_sym0_test"
         # data_dir = "data/data_sym0_test_select"
