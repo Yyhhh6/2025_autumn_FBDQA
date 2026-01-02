@@ -240,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
     parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
+    # parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
     parser.add_argument("--save_path", type=str, default="./models_ZZZ_sym0/", help="save_path")
 
     args = parser.parse_args()
