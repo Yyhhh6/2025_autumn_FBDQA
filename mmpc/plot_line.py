@@ -7,7 +7,7 @@ test_dir = "./data/data_sym1_test"
 test_files = [
     os.path.join(test_dir, f) for f in os.listdir(test_dir) if f.endswith(".csv")
 ]
-model = XGBModel("/hdd/yyh/src/quant/models_ZZZ/model_20_1_20251230_215625.json")
+model = XGBModel("qyh_fast/model_20_all_20260102_132520.json")
 
 test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=20)
 

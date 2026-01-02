@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_112319.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_132520.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -311,13 +311,13 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 还原原始股价
             feat_dict[f'original_price_lag{lag}'] = sym_to_price[row['sym']]
 
-            # # 股价分类
-            # feat_dict[f'sym_class_lag{lag}'] = (
-            #     0 if feat_dict[f'original_price_lag{lag}'] < 100 else 
-            #     1 if feat_dict[f'original_price_lag{lag}'] < 699 else 
-            #     2 if feat_dict[f'original_price_lag{lag}'] < 1500 else 
-            #     3             
-            # )
+            # 股价分类
+            feat_dict[f'sym_class_lag{lag}'] = (
+                0 if feat_dict[f'original_price_lag{lag}'] < 100 else 
+                1 if feat_dict[f'original_price_lag{lag}'] < 699 else 
+                2 if feat_dict[f'original_price_lag{lag}'] < 1500 else 
+                3             
+            )
 
             # 真趋势” vs “来回波动
             feat_dict[f'mid_diff1_open_close_lag{lag}'] = mid_diff1_open_close
@@ -386,6 +386,16 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
             feat_dict[f'price_move_capacity_lag{lag}'] = k_30 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-6)
             feat_dict[f'trend_liquidity_ratio_lag{lag}'] = np.sign(k_30) * r2_30 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-6)
+
+            # 门控趋势特征：趋势筛选 + 趋势强度
+            k_threshold = 0.00003
+            r2_threshold = 0.4
+
+            feat_dict[f'trend_regime_lag{lag}'] = (
+                (r2_30 > r2_threshold) &
+                (np.abs(k_30) > k_threshold)
+            ).astype(int)
+            feat_dict[f'trend_strength_gated_lag{lag}'] = feat_dict[f'mid_trend_strength_lag{lag}'] * feat_dict[f'trend_regime_lag{lag}']
 
             # ===== mid_diff1 的局部线性趋势（小窗口） =====
             window_size = 5
@@ -470,6 +480,8 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         # # TODO:
         # x_extract1 = preprocess_slice(x_slice)
         # print("x_extract1.shape: ", x_extract1.shape)
+        # # print("x_extract1['mid_lr_k_lag1']: ", x_extract1["mid_lr_k_lag1"])
+        # # print("x_extract1['mid_lr_r2_lag1']: ", x_extract1["mid_lr_r2_lag1"])
         # x_extract2 = preprocess_local(x_slice, is_slice=True)
         # print("x_extract2.shape: ", x_extract2.shape)
         # # 对列排序
@@ -534,7 +546,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     ]
 
     # 高阶特征
-    lags2 = [1, 2, 5]
+    # lags2 = [1, 2, 5]
     lags2 = [1]
     raw_cols2 = [
         'mid_diff1', 
@@ -555,15 +567,13 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         # 'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 
         'mid_lr_k', 'mid_lr_r2', "mid_trend_strength",
         'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
-        # # 'trend_persistence', 'trend_flip', 'trend_age',
-        # # 'trend_regime', 'trend_strength_gated', 
+        'trend_regime', 'trend_strength_gated', 
         'price_move_capacity', 
         'trend_liquidity_ratio',
         'trend_align_10_30', 
         'trend_align_30_60', 'trend_align_10_60', 'trend_confidence',
         'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10', 
         'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
-        # # 'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
         "close_delta1", "amount_delta1", "close_delta10", "amount_delta10", "close_delta40", "amount_delta40", 
         "midprice_delta1", "midprice_delta10", "midprice_delta40",
         "midprice_delta_rate1", "midprice_delta_rate10", "midprice_delta_rate40", 
@@ -656,18 +666,18 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         }
         extra_feats['original_price'] = df['sym'].map(sym_to_price)
 
-        # # 股价分类
-        # def price_to_class(price):
-        #     if price < 100:
-        #         return 0
-        #     elif price < 699:
-        #         return 1
-        #     elif price < 1500:
-        #         return 2
-        #     else:
-        #         return 3
+        # 股价分类
+        def price_to_class(price):
+            if price < 100:
+                return 0
+            elif price < 699:
+                return 1
+            elif price < 1500:
+                return 2
+            else:
+                return 3
 
-        # extra_feats['sym_class'] = extra_feats['original_price'].map(price_to_class)
+        extra_feats['sym_class'] = extra_feats['original_price'].map(price_to_class)
 
         # 对数盘口量 & 成交量
         for i in range(1, 6):
@@ -793,21 +803,14 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         df['mid_lr_r2'] = r2   # 拟合优度
         df['mid_trend_strength'] = np.sign(k) * r2
 
-        # # 信号的持续性
-        # df['trend_persistence'] = (
-        #     df['mid_trend_strength']
-        #     .rolling(20)
-        #     .apply(lambda x: np.sum(np.sign(x) == np.sign(x.iloc[-1])))
-        # )
-        # df['trend_flip'] = (np.sign(df['mid_lr_k']).diff() != 0).astype(int)
-        # df['trend_age'] = df['trend_flip'].rolling(50).sum()
-
-        # # 门控
-        # df['trend_regime'] = (
-        #     (df['mid_lr_r2'] > 0.25) &
-        #     (np.abs(df['mid_lr_k']) > np.percentile(np.abs(df['mid_lr_k']), 60))
-        # ).astype(int)
-        # df['trend_strength_gated'] = df['mid_trend_strength'] * df['trend_regime']
+        # 门控趋势特征：趋势筛选 + 趋势强度
+        k_threshold = 0.00003
+        r2_threshold = 0.4
+        df['trend_regime'] = (
+            (df['mid_lr_r2'] > r2_threshold) &
+            (np.abs(df['mid_lr_k']) > k_threshold)
+        ).astype(int)
+        df['trend_strength_gated'] = df['mid_trend_strength'] * df['trend_regime']
 
         k_10, r2_10 = rolling_lr_features(df['mid_price'].to_numpy(), window=10)
         k_30, r2_30 = k, r2
@@ -845,18 +848,6 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         df['pos_20'] = (df['mid_price'] - df['low_20']) / (df['high_20'] - df['low_20'] + 1e-6)
         df['pos_50'] = (df['mid_price'] - df['low_50']) / (df['high_50'] - df['low_50'] + 1e-6)
         df['pos_100'] = (df['mid_price'] - df['low_100']) / (df['high_100'] - df['low_100'] + 1e-6)
-
-        # # 时间衰减盘口特征
-        # decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
-        # decay = decay / decay.sum()
-        # def decay_mean(x):
-        #     w = decay[-len(x):]
-        #     return np.sum(x * w)
-        # df['bid1_decay'] = df['bid1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        # df['ask1_decay'] = df['ask1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        # df['spread_decay'] = df['spread'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        # df['bsize1_decay'] = df['bsize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
-        # df['asize1_decay'] = df['asize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
         
         # 盘口不平衡
         df['obi_1'] = (df['bsize1'] - df['asize1']) / (df['bsize1'] + df['asize1'] + 1e-6)
