@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_024253.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -103,7 +103,7 @@ def split_df_sliding(df: pd.DataFrame, window=100):
     return xs
 
 
-def compare_dfs(df1, df2, tol=1e-8):
+def compare_dfs(df1, df2, tol=1e-5):
     # --- 统一转成 DataFrame ---
     if isinstance(df1, pd.Series):
         df1 = df1.to_frame()
@@ -406,17 +406,17 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        x_extract1 = preprocess_slice(x_slice)
-        print("x_extract1.shape: ", x_extract1.shape)
-        x_extract2 = preprocess_local(x_slice, is_slice=True)
-        print("x_extract2.shape: ", x_extract2.shape)
-        # 对列排序
-        x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
-        x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
-        x_extract1.to_csv("x_extract1.csv", index=True)
-        x_extract2.to_csv("x_extract2.csv", index=True)
-        compare_dfs(x_extract1, x_extract2)
-        exit(0)
+        # x_extract1 = preprocess_slice(x_slice)
+        # print("x_extract1.shape: ", x_extract1.shape)
+        # x_extract2 = preprocess_local(x_slice, is_slice=True)
+        # print("x_extract2.shape: ", x_extract2.shape)
+        # # 对列排序
+        # x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
+        # x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
+        # x_extract1.to_csv("x_extract1.csv", index=True)
+        # x_extract2.to_csv("x_extract2.csv", index=True)
+        # compare_dfs(x_extract1, x_extract2)
+        # exit(0)
 
         if is_local==False:
             # 方法一

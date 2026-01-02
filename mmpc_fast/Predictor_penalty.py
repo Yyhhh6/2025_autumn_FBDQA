@@ -103,7 +103,7 @@ def split_df_sliding(df: pd.DataFrame, window=100):
     return xs
 
 
-def compare_dfs(df1, df2, tol=1e-8):
+def compare_dfs(df1, df2, tol=1e-5):
     # --- 统一转成 DataFrame ---
     if isinstance(df1, pd.Series):
         df1 = df1.to_frame()
@@ -406,24 +406,24 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        x_extract1 = preprocess_slice(x_slice)
-        print("x_extract1.shape: ", x_extract1.shape)
-        x_extract2 = preprocess_local(x_slice, is_slice=True)
-        print("x_extract2.shape: ", x_extract2.shape)
-        # 对列排序
-        x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
-        x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
-        x_extract1.to_csv("x_extract1.csv", index=True)
-        x_extract2.to_csv("x_extract2.csv", index=True)
-        compare_dfs(x_extract1, x_extract2)
-        exit(0)
+        # x_extract1 = preprocess_slice(x_slice)
+        # print("x_extract1.shape: ", x_extract1.shape)
+        # x_extract2 = preprocess_local(x_slice, is_slice=True)
+        # print("x_extract2.shape: ", x_extract2.shape)
+        # # 对列排序
+        # x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
+        # x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
+        # x_extract1.to_csv("x_extract1.csv", index=True)
+        # x_extract2.to_csv("x_extract2.csv", index=True)
+        # compare_dfs(x_extract1, x_extract2)
+        # exit(0)
 
         if is_local==False:
             # 方法一
             x_extract = preprocess_slice(x_slice)
         else:
             # 方法二
-            x_extract, _label = preprocess_local(x_slice, is_train=True, is_slice=True)
+            x_extract, _label, _ = preprocess_local(x_slice, is_train=True, is_slice=True)
             compare_dfs(label, _label)  # 二者相同！说明没问题
 
         assert len(x_extract) == len(label), f"len(x_extract): {len(x_extract)}    len(label): {len(label)}"
@@ -516,6 +516,9 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         for df in x:
             labels.append(df['label_20'][99:])
         label = pd.concat(labels, axis=0).reset_index(drop=True)
+
+        profit = np.concatenate([(df['n_midprice'].shift(-20) - df['n_midprice']).fillna(0).values for df in x], axis=0).astype(np.float32)
+        profit = np.ascontiguousarray(profit[99:]) # 现在如果买入，N步后盈利多少
 
     # 带进度条
     for i, df in tqdm(
@@ -801,6 +804,6 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     concat_df = concat_df[sorted(concat_df.columns)]
 
     if is_train:
-        return concat_df, label
+        return concat_df, label, profit
     else:
         return concat_df

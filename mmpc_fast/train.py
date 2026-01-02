@@ -298,7 +298,7 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_ZZZ_0/model_20_all_20251231_165909.json")
+        # model = XGBModel("qyh_fast/model_20_all_20260101_174013.json")
         data_dir = "data/data_sym_test"
         # data_dir = "data/data_sym0_test"
         # data_dir = "data/data_sym0_test_select"

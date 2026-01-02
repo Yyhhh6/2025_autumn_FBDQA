@@ -1,5 +1,5 @@
-from .model import XGBModel
-from .Predictor import preprocess_local, preprocess_platform
+from .model_penalty import XGBModel
+from .Predictor_penalty import preprocess_local, preprocess_platform
 from .data_process import *
 import os
 import numpy as np
@@ -13,8 +13,8 @@ from tqdm import tqdm
 # EXCLUDE_FILES = ['./data/data_raw/snapshot_sym1_date33_pm.csv', './data/data_raw/snapshot_sym7_date42_am.csv', './data/data_raw/snapshot_sym1_date25_am.csv', './data/data_raw/snapshot_sym6_date32_pm.csv', './data/data_raw/snapshot_sym4_date33_pm.csv', './data/data_raw/snapshot_sym2_date59_pm.csv', './data/data_raw/snapshot_sym1_date26_pm.csv', './data/data_raw/snapshot_sym2_date59_am.csv', './data/data_raw/snapshot_sym2_date57_pm.csv', './data/data_raw/snapshot_sym4_date34_am.csv', './data/data_raw/snapshot_sym5_date38_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym1_date33_am.csv', './data/data_raw/snapshot_sym1_date34_pm.csv', './data/data_raw/snapshot_sym0_date63_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym7_date10_pm.csv', './data/data_raw/snapshot_sym4_date32_pm.csv', './data/data_raw/snapshot_sym6_date42_pm.csv', './data/data_raw/snapshot_sym4_date33_am.csv', './data/data_raw/snapshot_sym7_date42_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv', './data/data_raw/snapshot_sym2_date42_pm.csv', './data/data_raw/snapshot_sym4_date34_pm.csv', './data/data_raw/snapshot_sym1_date25_pm.csv', './data/data_raw/snapshot_sym5_date23_pm.csv', './data/data_raw/snapshot_sym6_date33_pm.csv', './data/data_raw/snapshot_sym4_date31_pm.csv', './data/data_raw/snapshot_sym7_date10_am.csv', './data/data_raw/snapshot_sym0_date64_pm.csv', './data/data_raw/snapshot_sym0_date71_pm.csv', './data/data_raw/snapshot_sym0_date63_am.csv',]
 EXCLUDE_FILES = []
 
-TRAIN_RATIO = 1
-VAL_RATIO = 0.0
+TRAIN_RATIO = 0.9
+VAL_RATIO = 0.1
 SEED = 42
 
 # N_list = [5, 10, 20, 40, 60]
@@ -56,53 +56,54 @@ def extract_feature(files_dir, N):
     csv_files = files_dir
     def process_file(file, N):
         if os.path.exists(file):
-            df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
+            # df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
+            df = pd.read_csv(file)
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
-            df, labels = preprocess_platform(df, is_local=True)
+            df, labels, profits = preprocess_local(df, is_train=True)
             print("df.shape: ", df.shape)  # df.shape:  (1880, 420)
         else:
             print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
         
-        # print("len(df): ", len(df))
-        # print("len(labels): ", len(labels))
         assert len(df) == len(labels), f"len(df): {len(df)}      len(labels): {len(labels)}"
-        return df, labels
+        assert len(profits) == len(labels), f"len(profits): {len(profits)}      len(labels): {len(labels)}"
+        return df, labels, profits
 
     data = []
     labels_list = []
+    profits_list = []
 
     for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
-        df, labels = process_file(file, N)
+        df, labels, profits = process_file(file, N)
         data.append(df)
         labels_list.append(labels)
+        profits_list.append(profits)
 
     data = np.concatenate(data, axis=0)
     labels_list = np.concatenate(labels_list, axis=0)
+    profits_list = np.concatenate(profits_list, axis=0)
 
-    return data, labels_list
+    return data, labels_list, profits_list
 
-def extract_feature_test(files_dir, N, is_local=True):
-    if is_local:
+def extract_feature_test(files_dir, N, is_local=True, is_slice=False):
+    if is_slice==False:
         csv_files = files_dir
         def process_file(file, N):
             if os.path.exists(file):
-                df = pd.read_csv(file)#[:-N]
+                df = pd.read_csv(file)[:-N]
                 n_midprice = df['n_midprice'].values
                 if df.empty:
                     raise ValueError(f"File {file} is empty.")
                 df = df.reset_index(drop=True)
-                df, labels = preprocess_local(df, N)
-                df = df.squeeze(axis=0)
-                labels = labels[99:]
-                df_list = df[99:]
+                df, labels, _ = preprocess_local(df, is_train=True)
+
                 n_midprice = n_midprice[99:]
             else:
                 print("file: ", file)
                 raise FileNotFoundError(f"File {file} not found.")
-            return df_list, labels, n_midprice
+            return df, labels, n_midprice
 
         data = []
         labels_list = []
@@ -121,17 +122,14 @@ def extract_feature_test(files_dir, N, is_local=True):
         csv_files = files_dir
         def process_file(file, N):
             if os.path.exists(file):
-                df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
+                df = pd.read_csv(file)[:-N]
                 n_midprice = df['n_midprice'].values
                 if df.empty:
                     raise ValueError(f"File {file} is empty.")
                 df = df.reset_index(drop=True)
-                df, labels = preprocess_platform(df, is_local=True)
+                df, labels = preprocess_platform(df, is_local=is_local, is_upload=False)
                 df = df.squeeze(axis=0)   # (1, T, D) -> (T, D)
 
-                # 去除前100个tick（preprocess中已经去过）
-                # labels = labels[99:]
-                # df_list = df[99:]
                 n_midprice = n_midprice[99:]
             else:
                 print("file: ", file)
@@ -155,33 +153,38 @@ def extract_feature_test(files_dir, N, is_local=True):
 
         return data, labels_list, midprice_list
 
-def test(test_files, N, model, is_local=True):
-    test_data, test_labels, n_midprice = extract_feature_test(files_dir=test_files, N=N, is_local=is_local)
-    # print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
+def test(test_files, N, model, is_local=True, is_slice=False):
+    test_data, test_labels, n_midprice = extract_feature_test(files_dir=test_files, N=N, is_local=is_local, is_slice=is_slice)
     print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}")
-    # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
-    # model = XGBModel("mmpc/model_20.json")
-    y_pred = model.predict(test_data)   # (N, 3)
-    # print("y_pred shape: ", y_pred.shape)
-    # print("y_pred: ", y_pred)
 
-    # print("y_pred.shape: ", y_pred.shape)
+    # print("n_midprice: ", n_midprice)
+    # print("len(n_midprice): ", len(n_midprice))
+    # _sum = 0
+    # for i in range(len(n_midprice)):
+    #     _sum += len(n_midprice[i])
+    # print("_sum: ", _sum)
+
+    y_pred = model.predict(test_data)   # (N, 3)
+    print("y_pred shape: ", y_pred.shape)
 
     target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    # target_confidences = [0.5, 0.55, 0.6]
     # target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
+
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
         signal[confidence < target_confidence] = 1 # 信心不足时，预测为不变
         y = signal
+        print("y: ", y)
         print(f"y shape: {y.shape}, test_labels shape: {test_labels.shape}")
         from sklearn.metrics import classification_report, precision_score, recall_score, fbeta_score
         print(f"Results for N={N}:")
 
         # Recall：真实上涨/下跌中，被预测正确的比例
         index_recall = test_labels != 1
-        print("index_recall: ", index_recall)
+        # print("index_recall: ", index_recall)
         recall = sum(y[index_recall] == test_labels[index_recall]) / sum(index_recall)
 
         # Precision：预测上涨/下跌中，预测正确的比例
@@ -203,9 +206,9 @@ def test(test_files, N, model, is_local=True):
             for j in range(length):
                 if j + N >= length:
                     break
-                if signal[j+start] == 2:      # Long
+                if y[j+start] == 2:      # Long
                     pnl.append(n_midprice[i][j+N] - n_midprice[i][j])
-                elif signal[j+start] == 0:    # Short
+                elif y[j+start] == 0:    # Short
                     pnl.append(n_midprice[i][j] - n_midprice[i][j+N])
             start += length
 
@@ -241,9 +244,11 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_test", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_ZZZ/", help="save_path")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models_ZZZ_Penalty/", help="save_path")
 
+    parser.add_argument("--sym", type=str, default="all", help="sym identifier")
+    parser.add_argument("--penalty_scale", type=float, default=5.0, help="penalty_scale for custom loss")
     args = parser.parse_args()
 
     # 打印参数
@@ -259,6 +264,8 @@ if __name__ == "__main__":
     print(f"gamma: {args.gamma}")
     print(f"file_dir: {args.file_dir}")
     print(f"save_path: {args.save_path}")
+    print(f"sym: {args.sym}")
+    print(f"penalty_scale: {args.penalty_scale}")
     print("===============================")
 
     for N in N_list:
@@ -268,11 +275,10 @@ if __name__ == "__main__":
         print("train_files: ", train_files)
         print("val_files: ", val_files)
         print("test_files: ", test_files)
-        # exit(0)
 
         # 提取训练集、验证集、测试集的特征
-        train_data, train_labels = extract_feature(files_dir=train_files, N=N)
-        val_data, val_labels = extract_feature(files_dir=val_files, N=N)
+        train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
+        val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
 
         print("train_data.shape: ", train_data.shape)
         
@@ -294,15 +300,19 @@ if __name__ == "__main__":
             min_child_weight=args.min_child_weight,
             gamma=args.gamma,
             save_path=args.save_path,
-            # sym: str = "all",
+            sym=args.sym,
+            penalty_scale=args.penalty_scale,
+            train_profits=train_profits
         )
 
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_sym3/model_20_all_20251228_084958.json")
-        data_dir = "data/data_sym0_test"
+        # model = XGBModel("models_ZZZ_0/model_20_all_20251231_165909.json")
+        data_dir = "data/data_sym_test"
+        # data_dir = "data/data_sym0_test"
+        # data_dir = "data/data_sym0_test_select"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
@@ -310,8 +320,9 @@ if __name__ == "__main__":
             os.path.join(data_dir, f) not in EXCLUDE_FILES
         ]
         print("test_files2: ", test_files2)
-        # test(test_files, N=N, model=model)
-        test(test_files2, N=N, model=model, is_local=True)
-        test(test_files2, N=N, model=model, is_local=False)
+
+        test(test_files2, N=N, model=model)   # 本地最快评测
+        test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
+        test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")
