@@ -173,30 +173,22 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
         # 中间价一阶差分
         df['mid_price'] = 1 + df['n_midprice']
-        
-        df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
-        # s = df['mid_diff1']
-        # min_mid_diff1 = s.loc[s != 0].abs().min()
-
+        # df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
         # df['amount'] = np.log1p(df['amount_delta'])
 
-        # # ********************更快计算所有midprice的一阶差分，以及非零的最小一阶差分的绝对值********************
-        # mid_price = df['mid_price'].to_numpy()
-        # mid_diff1 = np.empty_like(mid_price)
-        # mid_diff1[0] = 0.0
-        # min_mid_diff1 = np.inf
-        # prev = mid_price[0]
-        # for i in range(1, len(mid_price)):
-        #     diff = mid_price[i] - prev
-        #     mid_diff1[i] = diff
-        #     if diff != 0:
-        #         ad = abs(diff)
-        #         if ad < min_mid_diff1:
-        #             min_mid_diff1 = ad
-        #     prev = mid_price[i]
-        # if min_mid_diff1 == np.inf:
-        #     min_mid_diff1 = 0.0
-        # df['mid_diff1'] = mid_diff1
+        # ********************下面用循环的方法计算差分好像更快********************
+        mid_price = df['mid_price'].to_numpy()
+        mid_diff1 = np.empty_like(mid_price)
+        mid_diff1[0] = 0.0
+        prev = mid_price[0]
+        mid_diff1_sum = 0
+        for i in range(1, 100):
+            diff = mid_price[i] - prev
+            mid_diff1[i] = diff
+            prev = mid_price[i] 
+            mid_diff1_sum += diff if diff > 0 else -diff
+        mid_diff1_open_close = mid_price[-1] - mid_price[0]
+        df['mid_diff1'] = mid_diff1
 
         # 用字典存每个lag的特征
         lag_feats = {}
@@ -292,6 +284,20 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
             lag_feats.update(feat_dict)
 
+        # 还原原始股价
+        sym_to_price = {
+            0: 1300,
+            1: 88.4,
+            2: 1004.6,
+            3: 61,
+            4: 444.4,
+            5: 302.4,
+            6: 535.2,
+            7: 323.2,
+            8: 395.4,
+            9: 1740,
+        }
+
         for lag in lags3:
             # 用iloc直接取lag对应行
             row = df.iloc[-lag]
@@ -302,8 +308,13 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 时间特征
             feat_dict[f'time_label_lag{lag}'] = assign_tick_time_label(row['time'])
 
-            # # 还原原始股价
-            # feat_dict[f'original_price_lag{lag}'] = 0.01 / min_mid_diff1
+            # 还原原始股价
+            feat_dict[f'original_price_lag{lag}'] = sym_to_price[row['sym']]
+
+            # 真趋势” vs “来回波动
+            feat_dict[f'mid_diff1_open_close_lag{lag}'] = mid_diff1_open_close
+            feat_dict[f'mid_diff1_sum_lag{lag}'] = mid_diff1_sum
+            feat_dict[f'SignedTrendEff_lag{lag}'] = mid_diff1_open_close / (mid_diff1_sum + 1e-5)
 
             # time: 处理 HH:MM:SS 转换为以秒为单位的数值
             h, m, s = row['time'].split(':')
@@ -448,7 +459,7 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        # TODO:
+        # # TODO:
         # x_extract1 = preprocess_slice(x_slice)
         # print("x_extract1.shape: ", x_extract1.shape)
         # x_extract2 = preprocess_local(x_slice, is_slice=True)
@@ -560,7 +571,8 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'bsize1_delta10', 'bsize3_delta10', 'bsize5_delta10',
         'asize1_delta40', 'asize3_delta40', 'asize5_delta40',
         'bsize1_delta40', 'bsize3_delta40', 'bsize5_delta40',
-        # 'original_price',
+        'original_price',
+        "mid_diff1_sum", "mid_diff1_open_close", "SignedTrendEff", 
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -598,12 +610,43 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             extra_feats[f'spread{i}'] = extra_feats[f'ask{i}'] - extra_feats[f'bid{i}']
             extra_feats[f'mid_price{i}'] = (extra_feats[f'ask{i}'] + extra_feats[f'bid{i}']) / 2
 
+        # 一阶差分
         extra_feats['mid_diff1'] = extra_feats['mid_price'].diff().fillna(0)
 
+        # 最近 100 tick 的 |diff| 之和（路径长度）
+        extra_feats['mid_diff1_sum'] = (
+            extra_feats['mid_diff1']
+            .abs()
+            .rolling(window=100, min_periods=1)
+            .sum()
+        )
+
+        # 最近 100 tick 的 diff 之和（起点到终点的净变化）
+        extra_feats['mid_diff1_open_close'] = (
+            extra_feats['mid_diff1']
+            .rolling(window=100, min_periods=1)
+            .sum()
+        )
+
+        # Signed Trend Efficiency
+        extra_feats['SignedTrendEff'] = (
+            extra_feats['mid_diff1_open_close'] / (extra_feats['mid_diff1_sum'] + 1e-5)
+        )
+
         # # 还原原始股价
-        # s = extra_feats['mid_diff1']
-        # min_mid_diff1 = s.loc[s != 0].abs().min()
-        # extra_feats[f'original_price'] = 0.01 / min_mid_diff1
+        sym_to_price = {
+            0: 1300,
+            1: 88.4,
+            2: 1004.6,
+            3: 61,
+            4: 444.4,
+            5: 302.4,
+            6: 535.2,
+            7: 323.2,
+            8: 395.4,
+            9: 1740,
+        }
+        extra_feats['original_price'] = df['sym'].map(sym_to_price)
 
         # 对数盘口量 & 成交量
         for i in range(1, 6):
