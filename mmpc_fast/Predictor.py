@@ -205,7 +205,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
         df['price_control'] = df['trade_sign'] * df['mid_diff1']
 
         df['close_pos'] = (
-            (df['n_close'] - df['mid_price'])
+            (df['n_close'] - df['n_midprice'])
             / ((df['n_ask1'] - df['n_bid1']) / 2 + 1e-10)
         )
 
@@ -217,10 +217,10 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 用iloc直接取lag对应行
             row = df.iloc[-lag]
 
-            # 收盘价还原 TODO: 收盘价是什么？
+            # 收盘价还原
             feat_dict[f'close_lag{lag}'] = row['n_close'] + 1
 
-            # 基础价格还原  TODO: 下面的这些采样点都需要改进
+            # 基础价格还原
             for i in range(1, 6):
                 feat_dict[f'bid{i}_lag{lag}'] = row[f'n_bid{i}'] + 1
                 feat_dict[f'ask{i}_lag{lag}'] = row[f'n_ask{i}'] + 1
@@ -276,11 +276,16 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 成交量与价格的比值（反映每单位价格变化的成交量变化）
             feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-10)
 
+            feat_dict[f'trade_sign_lag{lag}'] = row['trade_sign']
+            feat_dict[f'aggression_eff_lag{lag}'] = row['aggression_eff']
+            feat_dict[f'price_control_lag{lag}'] = row['price_control']
+            feat_dict[f'close_pos_lag{lag}'] = row['close_pos']
+
             lag_feats.update(feat_dict)
 
-        for lag in lags2:
-            # 用iloc直接取lag对应行
-            row = df.iloc[-lag]
+        # for lag in lags2:
+        #     # 用iloc直接取lag对应行
+        #     row = df.iloc[-lag]
 
             # 一阶 / 二阶差分（注意边界）
             feat_dict[f'mid_diff1_lag{lag}'] = row["mid_diff1"]
@@ -669,14 +674,18 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'relative_bid_density1', 'relative_bid_density2', 'relative_bid_density3', 
         'relative_ask_density1', 'relative_ask_density2', 'relative_ask_density3',
         'real_volume', 'price_volume_ratio',
+        
+        'mid_diff1', 
+        'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
+        'trade_sign', 'aggression_eff', 'price_control', 'close_pos',
     ]
 
     # 高阶特征
     # lags2 = [1, 2, 5]
     lags2 = [1]
     raw_cols2 = [
-        'mid_diff1', 
-        'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
+        # 'mid_diff1', 
+        # 'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
     ]
 
     # 高阶特征
@@ -968,7 +977,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         df['price_control'] = df['trade_sign'] * extra_feats['mid_diff1']
 
         df['close_pos'] = (
-            (df['n_close'] - extra_feats['mid_diff1'])
+            (df['n_close'] - df['n_midprice'])
             / ((df['n_ask1'] - df['n_bid1']) / 2 + 1e-10)
         )
         
