@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_210830.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_235444.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -22,7 +22,7 @@ class Predictor():
         x_hat = self.preprocess(x)
 
         y = []
-        target_confidence = 0.75
+        target_confidence = 0.8
         y_pred = self.model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
@@ -176,6 +176,9 @@ def preprocess_slice(x: list[pd.DataFrame]):
         # df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
         # df['amount'] = np.log1p(df['amount_delta'])
 
+        # 真实成交量
+        df['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
+
         # ********************下面用循环的方法计算差分好像更快********************
         mid_price = df['mid_price'].to_numpy()
         mid_diff1 = np.empty_like(mid_price)
@@ -252,12 +255,12 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'bid_depth_slope_lag{lag}'] = (feat_dict[f'bsize5_lag{lag}'] - feat_dict[f'bsize1_lag{lag}']) / 4
             feat_dict[f'ask_depth_slope_lag{lag}'] = (feat_dict[f'asize5_lag{lag}'] - feat_dict[f'asize1_lag{lag}']) / 4
 
-            # # 真实成交量特征
-            # feat_dict[f'real_volume_lag{lag}'] = row['amount_delta'] / (row['mid_price'] + 1e-6)
-            # # 成交量与价格的比值（反映每单位价格变化的成交量变化）
-            # feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-6)
-            # # 成交量的前向差分（反映成交量的变化趋势）
-            # feat_dict[f'real_volume_diff1_lag{lag}'] = df.iloc[-lag]["amount_delta"] / (df.iloc[-lag]['mid_price'] + 1e-6) - df.iloc[-lag-1]["amount_delta"] / (df.iloc[-lag-1]['mid_price'] + 1e-6) 
+            # 真实成交量特征
+            feat_dict[f'real_volume_lag{lag}'] = row['real_volume']
+            # 成交量与价格的比值（反映每单位价格变化的成交量变化）
+            feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-6)
+            # 成交量的前向差分（反映成交量的变化趋势）
+            feat_dict[f'real_volume_diff1_lag{lag}'] = df.iloc[-lag]["real_volume"] - df.iloc[-lag-1]["real_volume"]  
 
             lag_feats.update(feat_dict)
 
@@ -393,7 +396,14 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'mid_diff1_lr_k_lag{lag}'] = k_d1
             feat_dict[f'mid_diff1_lr_r2_lag{lag}'] = r2_d1
             feat_dict[f'mid_diff1_trend_strength_lag{lag}'] = np.sign(k_d1) * r2_d1
-
+            
+            # ===== 真实量线性回归 =====
+            window_size = 20
+            real_volume_window = df['real_volume'].iloc[-lag+1-window_size:None if lag == 1 else -lag+1]
+            k_d1, r2_d1 = rolling_lr_k_r2(real_volume_window)
+            feat_dict[f'real_volume_lr_k_lag{lag}'] = k_d1
+            feat_dict[f'real_volume_lr_r2_lag{lag}'] = r2_d1
+            
             # ===== 多尺度中间价线性趋势 =====
             # lr_windows = [10]  # window_size=30前面已经算过
             lr_windows = [10, 60]  # window_size=30前面已经算过
@@ -529,7 +539,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         "vol1_rel_diff", "vol3_rel_diff", "vol5_rel_diff", 
         'relative_bid_density1', 'relative_bid_density2', 'relative_bid_density3', 
         'relative_ask_density1', 'relative_ask_density2', 'relative_ask_density3',
-        # 'real_volume', 'price_volume_ratio', 'real_volume_diff1'
+        'real_volume', 'price_volume_ratio', 'real_volume_diff1'
     ]
 
     # 高阶特征
@@ -580,6 +590,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'bsize1_delta40', 'bsize3_delta40', 'bsize5_delta40',
         'original_price',
         "mid_diff1_sum", "mid_diff1_open_close", "SignedTrendEff", 
+        "real_volume_lr_k", "real_volume_lr_r2"
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -884,12 +895,16 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         )
         extra_feats['amount_price_div'] = df['mid_diff1'] / (df['amount'] + 1e-6)
 
-        # # 真实成交量特征
-        # extra_feats['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
-        # # 成交量与价格的比值（反映每单位价格变化的成交量变化）
-        # extra_feats['price_volume_ratio'] = df['mid_price'] / (extra_feats['real_volume'] + 1e-6)
-        # # 成交量的前向差分（反映成交量的变化趋势）
-        # extra_feats['real_volume_diff1'] = extra_feats['real_volume'].diff().fillna(0)
+        # 真实成交量特征
+        extra_feats['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
+        # 成交量与价格的比值（反映每单位价格变化的成交量变化）
+        extra_feats['price_volume_ratio'] = df['mid_price'] / (extra_feats['real_volume'] + 1e-6)
+        # 成交量的前向差分（反映成交量的变化趋势）
+        extra_feats['real_volume_diff1'] = extra_feats['real_volume'].diff().fillna(0)
+        # real_volume线性回归
+        k, r2 = rolling_lr_features(extra_feats['real_volume'].to_numpy(), window=20)
+        extra_feats['real_volume_lr_k'] = k   # 斜率
+        extra_feats['real_volume_lr_r2'] = r2   # 拟合优度
         
         df = pd.concat([df, pd.DataFrame(extra_feats, index=df.index)], axis=1)
 
