@@ -192,6 +192,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
             mid_diff1_sum += diff if diff > 0 else -diff
         mid_diff1_open_close = mid_price[-1] - mid_price[0]
         df['mid_diff1'] = mid_diff1
+        # print("mid_diff1: ", mid_diff1)
 
         # 用字典存每个lag的特征
         lag_feats = {}
@@ -367,11 +368,15 @@ def preprocess_slice(x: list[pd.DataFrame]):
                     feat_dict[f'asize{i}_delta{w}_lag{lag}'] = feat_dict[f'asize{i}_lag{lag}'] - np.log1p(df[f'n_asize{i}'].iloc[-lag-w])
                     feat_dict[f'bsize{i}_delta{w}_lag{lag}'] = feat_dict[f'bsize{i}_lag{lag}'] - np.log1p(df[f'n_bsize{i}'].iloc[-lag-w])
 
+            mid_diff1_spike_th = 0.0008
+            mid_diff1_threshold_1 = 10
+            mid_diff1_threshold_2 = 50
+
             # 窗口特征
             for w in [5, 20, 50, 100]:
                 feat_dict[f'mid_price_ma{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_price_std{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
-                feat_dict[f'mid_price_vol_ratio{w}_lag{lag}'] = feat_dict[f'mid_price_std{w}_lag{lag}'] / (feat_dict[f'mid_price_ma{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'mid_price_vol_ratio{w}_lag{lag}'] = feat_dict[f'mid_price_std{w}_lag{lag}'] / (np.abs(feat_dict[f'mid_price_ma{w}_lag{lag}']) + 1e-10)
        
                 feat_dict[f'mid_price_max{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
                 feat_dict[f'mid_price_min{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
@@ -380,20 +385,56 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
                 feat_dict[f'mid_diff1_ma{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_diff1_std{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
-                feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'] = feat_dict[f'mid_diff1_std{w}_lag{lag}'] / (feat_dict[f'mid_diff1_ma{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'] = feat_dict[f'mid_diff1_std{w}_lag{lag}'] / (np.abs(feat_dict[f'mid_diff1_ma{w}_lag{lag}']) + 1e-10)
+                # print("feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}']: ", feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'])
 
                 feat_dict[f'mid_diff1_max{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
                 feat_dict[f'mid_diff1_min{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
                 feat_dict[f'mid_diff1_max_min{w}_lag{lag}'] = feat_dict[f'mid_diff1_max{w}_lag{lag}'] - feat_dict[f'mid_diff1_min{w}_lag{lag}']
-                
+
+                # 窗口内是否曾出现强冲击
+                feat_dict[f'mid_diff1_has_spike{w}_lag{lag}'] = (
+                    (feat_dict[f'mid_diff1_max{w}_lag{lag}'] > mid_diff1_spike_th) or (-feat_dict[f'mid_diff1_min{w}_lag{lag}'] > mid_diff1_spike_th)
+                ).astype(int)
+                # 窗口内是否出现 高震荡or平台
+                feat_dict[f'mid_diff1_is_flat{w}_lag{lag}'] = (
+                    (feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'] < mid_diff1_threshold_1)
+                ).astype(int)
+                feat_dict[f'mid_diff1_is_high_vol{w}_lag{lag}'] = (
+                    (feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'] > mid_diff1_threshold_2)
+                ).astype(int)
+
+                mid_diff = df['mid_price'].diff()
+                window_diff = mid_diff.iloc[
+                    -lag-w+1 : None if lag == 1 else -lag+1
+                ]
+
+                # # sign_consistency_20（方向一致性）
+                # feat_dict[f'sign_consistency{w}_lag{lag}'] = np.abs(
+                #     np.sign(window_diff).mean()
+                # )
+
+                # # trend_persist_20（趋势持续性）
+                # signs = np.sign(window_diff)
+                # last_sign = signs.iloc[-1]
+                # feat_dict[f'trend_persist{w}_lag{lag}'] = np.sum(
+                #     signs == last_sign
+                # )
+
                 feat_dict[f'real_volume_ma{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'real_volume_std{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
-                feat_dict[f'real_volume_vol_ratio{w}_lag{lag}'] = feat_dict[f'real_volume_std{w}_lag{lag}'] / (feat_dict[f'real_volume_ma{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'real_volume_vol_ratio{w}_lag{lag}'] = feat_dict[f'real_volume_std{w}_lag{lag}'] / (np.abs(feat_dict[f'real_volume_ma{w}_lag{lag}']) + 1e-10)
        
                 feat_dict[f'real_volume_max{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
                 feat_dict[f'real_volume_min{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
                 feat_dict[f'real_volume_max_min{w}_lag{lag}'] = feat_dict[f'real_volume_max{w}_lag{lag}'] - feat_dict[f'real_volume_min{w}_lag{lag}']
                 feat_dict[f'real_volume_pos_{w}_lag{lag}'] = (row['real_volume'] -  feat_dict[f'real_volume_min{w}_lag{lag}']) / (feat_dict[f'real_volume_max{w}_lag{lag}'] -  feat_dict[f'real_volume_min{w}_lag{lag}'] + 1e-10)
+
+            # 长短窗口特征对比
+            feat_dict[f'mid_diff1_vol_ratio_sl_5_50_lag{lag}'] = feat_dict[f'mid_diff1_vol_ratio5_lag{lag}'] / (feat_dict[f'mid_diff1_vol_ratio50_lag{lag}'] + 1e-6)
+            feat_dict[f'real_volume_vol_ratio_sl_5_50_lag{lag}'] = feat_dict[f'real_volume_vol_ratio5_lag{lag}'] / (feat_dict[f'real_volume_vol_ratio50_lag{lag}'] + 1e-6)
+            feat_dict[f'mid_diff1_vol_ratio_sl_20_100_lag{lag}'] = feat_dict[f'mid_diff1_vol_ratio20_lag{lag}'] / (feat_dict[f'mid_diff1_vol_ratio100_lag{lag}'] + 1e-6)
+            feat_dict[f'real_volume_vol_ratio_sl_20_100_lag{lag}'] = feat_dict[f'real_volume_vol_ratio20_lag{lag}'] / (feat_dict[f'real_volume_vol_ratio100_lag{lag}'] + 1e-6)
 
             # ===== mid_diff1 的局部线性趋势（小窗口） =====
             window_size = 5
@@ -521,20 +562,21 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        # # TODO:
-        # x_extract1 = preprocess_slice(x_slice)
-        # print("x_extract1.shape: ", x_extract1.shape)
-        # # print("x_extract1['mid_lr_k_lag1']: ", x_extract1["mid_lr_k_lag1"])
-        # # print("x_extract1['mid_lr_r2_lag1']: ", x_extract1["mid_lr_r2_lag1"])
-        # x_extract2 = preprocess_local(x_slice, is_slice=True)
-        # print("x_extract2.shape: ", x_extract2.shape)
-        # # 对列排序
-        # x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
-        # x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
-        # x_extract1.to_csv("x_extract1.csv", index=True)
-        # x_extract2.to_csv("x_extract2.csv", index=True)
-        # compare_dfs(x_extract1, x_extract2)
-        # exit(0)
+        # TODO:
+        x_extract1 = preprocess_slice(x_slice)
+        print("x_extract1.shape: ", x_extract1.shape)
+        # print("x_extract1['mid_diff1']: ", x_extract1["mid_diff1"])
+        # print("x_extract1['mid_lr_k_lag1']: ", x_extract1["mid_lr_k_lag1"])
+        # print("x_extract1['mid_lr_r2_lag1']: ", x_extract1["mid_lr_r2_lag1"])
+        x_extract2 = preprocess_local(x_slice, is_slice=True)
+        print("x_extract2.shape: ", x_extract2.shape)
+        # 对列排序
+        x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
+        x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
+        x_extract1.to_csv("x_extract1.csv", index=True)
+        x_extract2.to_csv("x_extract2.csv", index=True)
+        compare_dfs(x_extract1, x_extract2)
+        exit(0)
 
         if is_local==False:
             # 方法一
@@ -659,6 +701,15 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         "real_volume_lr_k", "real_volume_lr_r2", "real_volume_trend_strength", 
         "real_volume_price_move_capacity", "real_volume_trend_liquidity_ratio", 
         "real_volume_trend_regime", "real_volume_trend_strength_gated", 
+        "mid_diff1_has_spike5", "mid_diff1_has_spike20", "mid_diff1_has_spike50", "mid_diff1_has_spike100", 
+        "mid_diff1_is_flat5", "mid_diff1_is_flat20", "mid_diff1_is_flat50", "mid_diff1_is_flat100", 
+        "mid_diff1_is_high_vol5", "mid_diff1_is_high_vol20", "mid_diff1_is_high_vol50", "mid_diff1_is_high_vol100", 
+        # "sign_consistency5", "sign_consistency20", "sign_consistency50", "sign_consistency100", 
+        # "trend_persist5", "trend_persist20", "trend_persist50", "trend_persist100", 
+        "mid_diff1_vol_ratio_sl_5_50", 
+        "real_volume_vol_ratio_sl_5_50", 
+        "mid_diff1_vol_ratio_sl_20_100", 
+        "real_volume_vol_ratio_sl_20_100", 
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -789,17 +840,21 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         # # 成交量的前向差分（反映成交量的变化趋势）
         # extra_feats['real_volume_diff1'] = extra_feats['real_volume'].diff().fillna(0)
 
+        mid_diff1_spike_th = 0.0008
+        mid_diff1_threshold_1 = 10
+        mid_diff1_threshold_2 = 50
+
         # 均线特征
         for w in [5, 20, 50, 100]:
             # extra_feats[f'ask1_ma{w}'] = extra_feats['ask1'].rolling(w, min_periods=1).mean()
             # extra_feats[f'bid1_ma{w}'] = extra_feats['bid1'].rolling(w, min_periods=1).mean()
             extra_feats[f'mid_price_ma{w}'] = extra_feats['mid_price'].rolling(w, min_periods=1).mean()
             extra_feats[f'mid_price_std{w}'] = extra_feats['mid_price'].rolling(w, min_periods=1).std()
-            extra_feats[f'mid_price_vol_ratio{w}'] = extra_feats[f'mid_price_std{w}'] / (extra_feats[f'mid_price_ma{w}'] + 1e-10)
+            extra_feats[f'mid_price_vol_ratio{w}'] = extra_feats[f'mid_price_std{w}'] / (np.abs(extra_feats[f'mid_price_ma{w}']) + 1e-10)
 
             extra_feats[f'mid_diff1_ma{w}'] = extra_feats['mid_diff1'].rolling(w, min_periods=1).mean()
             extra_feats[f'mid_diff1_std{w}'] = extra_feats['mid_diff1'].rolling(w, min_periods=1).std()
-            extra_feats[f'mid_diff1_vol_ratio{w}'] = extra_feats[f'mid_diff1_std{w}'] / (extra_feats[f'mid_diff1_ma{w}'] + 1e-10)
+            extra_feats[f'mid_diff1_vol_ratio{w}'] = extra_feats[f'mid_diff1_std{w}'] / (np.abs(extra_feats[f'mid_diff1_ma{w}']) + 1e-10)
 
             extra_feats[f'mid_diff1_max{w}'] = extra_feats['mid_diff1'].rolling(w, min_periods=1).max()
             extra_feats[f'mid_diff1_min{w}'] = extra_feats['mid_diff1'].rolling(w, min_periods=1).min()
@@ -812,12 +867,49 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
                 
             extra_feats[f'real_volume_ma{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).mean()
             extra_feats[f'real_volume_std{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).std()
-            extra_feats[f'real_volume_vol_ratio{w}'] = extra_feats[f'real_volume_std{w}'] / (extra_feats[f'real_volume_ma{w}'] + 1e-10)
+            extra_feats[f'real_volume_vol_ratio{w}'] = extra_feats[f'real_volume_std{w}'] / (np.abs(extra_feats[f'real_volume_ma{w}']) + 1e-10)
     
             extra_feats[f'real_volume_max{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).max()
             extra_feats[f'real_volume_min{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).min()
             extra_feats[f'real_volume_max_min{w}'] = extra_feats[f'real_volume_max{w}'] - extra_feats[f'real_volume_min{w}']
             extra_feats[f'real_volume_pos_{w}'] = (extra_feats['real_volume'] -  extra_feats[f'real_volume_min{w}']) / (extra_feats[f'real_volume_max{w}'] -  extra_feats[f'real_volume_min{w}'] + 1e-10)
+
+            # 窗口内是否曾出现强冲击
+            extra_feats[f'mid_diff1_has_spike{w}'] = (
+                (extra_feats[f'mid_diff1_max{w}'] > mid_diff1_spike_th)
+                |
+                (-extra_feats[f'mid_diff1_min{w}'] > mid_diff1_spike_th)
+            ).astype(int)
+            # 窗口内是否出现 高震荡or平台
+            extra_feats[f'mid_diff1_is_flat{w}'] = (
+                (extra_feats[f'mid_diff1_vol_ratio{w}'] < mid_diff1_threshold_1)
+            ).astype(int)
+            extra_feats[f'mid_diff1_is_high_vol{w}'] = (
+                (extra_feats[f'mid_diff1_vol_ratio{w}'] > mid_diff1_threshold_2)
+            ).astype(int)
+
+            # # _20（方向一致性）
+            # sign_series = np.sign(extra_feats['mid_diff1'])
+            # extra_feats[f'sign_consistency{w}'] = (
+            #     sign_series
+            #     .rolling(w, min_periods=1)
+            #     .mean()
+            #     .abs()
+            # )
+
+            # # trend_persist_20（趋势持续性）
+            # last_sign = sign_series  # rolling 窗口的“最后一个值”
+            # extra_feats[f'trend_persist{w}'] = (
+            #     (sign_series == last_sign)
+            #     .rolling(w, min_periods=1)
+            #     .sum()
+            # )
+
+        # 长短窗口特征对比sign_consistency
+        extra_feats[f'mid_diff1_vol_ratio_sl_5_50'] = extra_feats[f'mid_diff1_vol_ratio5'] / (extra_feats[f'mid_diff1_vol_ratio50'] + 1e-6)
+        extra_feats[f'real_volume_vol_ratio_sl_5_50'] = extra_feats[f'real_volume_vol_ratio5'] / (extra_feats[f'real_volume_vol_ratio50'] + 1e-6)
+        extra_feats[f'mid_diff1_vol_ratio_sl_20_100'] = extra_feats[f'mid_diff1_vol_ratio20'] / (extra_feats[f'mid_diff1_vol_ratio100'] + 1e-6)
+        extra_feats[f'real_volume_vol_ratio_sl_20_100'] = extra_feats[f'real_volume_vol_ratio20'] / (extra_feats[f'real_volume_vol_ratio100'] + 1e-6)
 
         # 加权中间价
         extra_feats.update({
