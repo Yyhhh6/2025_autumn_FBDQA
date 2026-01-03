@@ -232,6 +232,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
     parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
+    parser.add_argument("--early_stopping_rounds", type=int, default=150, help="Number of early stopping rounds")
     parser.add_argument("--weight1", type=float, default=1.5, help="Weight 1 for custom loss")
     parser.add_argument("--weight2", type=float, default=0.5, help="Weight 2 for custom loss")
     parser.add_argument("--weight3", type=float, default=1.5, help="Weight 3 for custom loss")
@@ -244,13 +245,14 @@ if __name__ == "__main__":
     
     parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
     # parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_Z/", help="save_path")
+    parser.add_argument("--save_path", type=str, default="./models_QYH/", help="save_path")
 
     args = parser.parse_args()
 
     # 打印参数
     print("===== Training Parameters =====")
     print(f"num_boost_round: {args.num_boost_round}")
+    print(f"early_stopping_rounds: {args.early_stopping_rounds}")
     print(f"weight1: {args.weight1}")
     print(f"weight2: {args.weight2}")
     print(f"weight3: {args.weight3}")
@@ -286,7 +288,7 @@ if __name__ == "__main__":
             val_data,
             val_labels,
             num_boost_round=args.num_boost_round,
-            early_stopping_rounds=150,
+            early_stopping_rounds=args.early_stopping_rounds,
             N=N,
             weight1=args.weight1,
             weight2=args.weight2,

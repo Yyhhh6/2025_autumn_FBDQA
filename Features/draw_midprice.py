@@ -47,7 +47,7 @@ for file_path in file_paths:
     df['idx'] = range(len(df))
 
     # 构造保存文件名
-    file_name = os.path.basename(file_path).replace('.csv', '_features.png')
+    file_name = os.path.basename(file_path).replace('.csv', '_midprice.png')
     save_path = os.path.join(save_dir, file_name)
 
     # 绘图
