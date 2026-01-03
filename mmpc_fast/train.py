@@ -56,17 +56,22 @@ def extract_feature(files_dir, N):
     csv_files = files_dir
     def process_file(file, N):
         if os.path.exists(file):
-            df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
+            # df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
+            df = pd.read_csv(file)    # 加入penalty，不要[:-N]
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
             df, labels, profits = preprocess_local(df, is_train=True)
-            # print("df.shape: ", df.shape)  # df.shape:  (1880, 420)
+            df = df[:-N]
+            labels = labels[:-N]
+            profits = profits[:-N]
+            print("df.shape: ", df.shape)  # df.shape:  (1880, 420)
         else:
             print("file: ", file)
             raise FileNotFoundError(f"File {file} not found.")
         
         assert len(df) == len(labels), f"len(df): {len(df)}      len(labels): {len(labels)}"
+        assert len(profits) == len(labels), f"len(profits): {len(profits)}      len(labels): {len(labels)}"
         return df, labels, profits
 
     data = []
@@ -243,9 +248,12 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
-    # parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
+    # parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
     parser.add_argument("--save_path", type=str, default="./models_QYH/", help="save_path")
+
+    parser.add_argument("--sym", type=str, default="all", help="sym identifier")
+    parser.add_argument("--penalty_scale", type=float, default=100.0, help="penalty_scale for custom loss")
 
     args = parser.parse_args()
 
@@ -263,55 +271,55 @@ if __name__ == "__main__":
     print(f"gamma: {args.gamma}")
     print(f"file_dir: {args.file_dir}")
     print(f"save_path: {args.save_path}")
-    # print(f"sym: {args.sym}")
-    # print(f"penalty_scale: {args.penalty_scale}")
+    print(f"sym: {args.sym}")
+    print(f"penalty_scale: {args.penalty_scale}")
     print("===============================")
 
     for N in N_list:
-        # 划分训练集、验证集、测试集
-        train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+        # # 划分训练集、验证集、测试集
+        # train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
-        print("train_files: ", train_files)
-        print("val_files: ", val_files)
-        print("test_files: ", test_files)
+        # print("train_files: ", train_files)
+        # print("val_files: ", val_files)
+        # print("test_files: ", test_files)
 
-        # 提取训练集、验证集、测试集的特征
-        train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
-        val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
+        # # 提取训练集、验证集、测试集的特征
+        # train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
+        # val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
 
-        print("train_data.shape: ", train_data.shape)
+        # print("train_data.shape: ", train_data.shape)
         
-        model = XGBModel()
-        model.train(
-            train_data,
-            train_labels,
-            val_data,
-            val_labels,
-            num_boost_round=args.num_boost_round,
-            early_stopping_rounds=args.early_stopping_rounds,
-            N=N,
-            weight1=args.weight1,
-            weight2=args.weight2,
-            weight3=args.weight3,
-            max_depth=args.max_depth,
-            subsample=args.subsample,
-            colsample_bytree=args.colsample_bytree,
-            min_child_weight=args.min_child_weight,
-            gamma=args.gamma,
-            save_path=args.save_path,
-            # sym = args.sym,
-            # penalty_scale=args.penalty_scale,
-            # profit_train=train_profits
-        )
+        # model = XGBModel()
+        # model.train(
+        #     train_data,
+        #     train_labels,
+        #     val_data,
+        #     val_labels,
+        #     num_boost_round=args.num_boost_round,
+        #     early_stopping_rounds=args.early_stopping_rounds,
+        #     N=N,
+        #     weight1=args.weight1,
+        #     weight2=args.weight2,
+        #     weight3=args.weight3,
+        #     max_depth=args.max_depth,
+        #     subsample=args.subsample,
+        #     colsample_bytree=args.colsample_bytree,
+        #     min_child_weight=args.min_child_weight,
+        #     gamma=args.gamma,
+        #     save_path=args.save_path,
+        #     sym=args.sym,
+        #     penalty_scale=args.penalty_scale,
+        #     train_profits=train_profits
+        # )
 
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_ZZZ_Penalty/model_20_all_20260102_024253.json")
-        data_dir = "data/data_sym_test"
+        model = XGBModel("qyh_fast/model_20_all_20260102_174648.json")
+        # data_dir = "data/data_sym_test"
         # data_dir = "data/data_sym0_test"
-        # data_dir = "data/data_sym0_test_select"
+        data_dir = "data/data_sym0_test_select"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
@@ -320,8 +328,8 @@ if __name__ == "__main__":
         ]
         print("test_files2: ", test_files2)
 
-        test(test_files2, N=N, model=model)   # 本地最快评测
-        # test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
+        # test(test_files2, N=N, model=model)   # 本地最快评测
+        test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
         # test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")

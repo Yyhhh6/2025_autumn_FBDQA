@@ -177,7 +177,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
         # df['amount'] = np.log1p(df['amount_delta'])
 
         # 真实成交量
-        df['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
+        df['real_volume'] = np.log1p(df['amount_delta'] / (df['mid_price'] + 1e-10))
 
         # ********************下面用循环的方法计算差分好像更快********************
         mid_price = df['mid_price'].to_numpy()
@@ -258,9 +258,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 真实成交量特征
             feat_dict[f'real_volume_lag{lag}'] = row['real_volume']
             # 成交量与价格的比值（反映每单位价格变化的成交量变化）
-            feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-6)
-            # 成交量的前向差分（反映成交量的变化趋势）
-            feat_dict[f'real_volume_diff1_lag{lag}'] = df.iloc[-lag]["real_volume"] - df.iloc[-lag-1]["real_volume"]  
+            feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-10)
 
             lag_feats.update(feat_dict)
 
@@ -350,6 +348,10 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 # feat_dict[f'midprice_delta{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag]
                 feat_dict[f'close_delta{w}_lag{lag}'] = row['n_close'] - df['n_close'].iloc[-lag-w]
                 feat_dict[f'amount_delta{w}_lag{lag}'] = feat_dict[f'amount_lag{lag}'] - np.log1p(df['amount_delta'].iloc[-lag-w])
+
+                # 成交量的前向差分（反映成交量的变化趋势）
+                feat_dict[f'real_volume_delta{w}_lag{lag}'] = feat_dict[f'real_volume_lag{lag}'] - df["real_volume"].iloc[-lag-w]  
+                
                 for i in [1, 3, 5]:
                     feat_dict[f'ask{i}_delta{w}_lag{lag}'] = row[f'n_ask{i}'] - df[f'n_ask{i}'].iloc[-lag-w]
                     feat_dict[f'bid{i}_delta{w}_lag{lag}'] = row[f'n_bid{i}'] - df[f'n_bid{i}'].iloc[-lag-w]
@@ -362,6 +364,11 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 feat_dict[f'mid_price_ma{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_price_std{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
                 feat_dict[f'mid_price_vol_ratio{w}_lag{lag}'] = feat_dict[f'mid_price_std{w}_lag{lag}'] / (feat_dict[f'mid_price_ma{w}_lag{lag}'] + 1e-10)
+       
+                feat_dict[f'mid_price_max{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
+                feat_dict[f'mid_price_min{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
+                feat_dict[f'mid_price_max_min{w}_lag{lag}'] = feat_dict[f'mid_price_max{w}_lag{lag}'] - feat_dict[f'mid_price_min{w}_lag{lag}']
+                feat_dict[f'pos_{w}_lag{lag}'] = (row['mid_price'] -  feat_dict[f'mid_price_min{w}_lag{lag}']) / (feat_dict[f'mid_price_max{w}_lag{lag}'] -  feat_dict[f'mid_price_min{w}_lag{lag}'] + 1e-10)
 
                 feat_dict[f'mid_diff1_ma{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_diff1_std{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
@@ -370,11 +377,15 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 feat_dict[f'mid_diff1_max{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
                 feat_dict[f'mid_diff1_min{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
                 feat_dict[f'mid_diff1_max_min{w}_lag{lag}'] = feat_dict[f'mid_diff1_max{w}_lag{lag}'] - feat_dict[f'mid_diff1_min{w}_lag{lag}']
+                
+                feat_dict[f'real_volume_ma{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
+                feat_dict[f'real_volume_std{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
+                feat_dict[f'real_volume_vol_ratio{w}_lag{lag}'] = feat_dict[f'real_volume_std{w}_lag{lag}'] / (feat_dict[f'real_volume_ma{w}_lag{lag}'] + 1e-10)
        
-                feat_dict[f'mid_price_max{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
-                feat_dict[f'mid_price_min{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
-                feat_dict[f'mid_price_max_min{w}_lag{lag}'] = feat_dict[f'mid_price_max{w}_lag{lag}'] - feat_dict[f'mid_price_min{w}_lag{lag}']
-                feat_dict[f'pos_{w}_lag{lag}'] = (row['mid_price'] -  feat_dict[f'mid_price_min{w}_lag{lag}']) / (feat_dict[f'mid_price_max{w}_lag{lag}'] -  feat_dict[f'mid_price_min{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'real_volume_max{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
+                feat_dict[f'real_volume_min{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
+                feat_dict[f'real_volume_max_min{w}_lag{lag}'] = feat_dict[f'real_volume_max{w}_lag{lag}'] - feat_dict[f'real_volume_min{w}_lag{lag}']
+                feat_dict[f'real_volume_pos_{w}_lag{lag}'] = (row['real_volume'] -  feat_dict[f'real_volume_min{w}_lag{lag}']) / (feat_dict[f'real_volume_max{w}_lag{lag}'] -  feat_dict[f'real_volume_min{w}_lag{lag}'] + 1e-10)
 
             # ===== mid_diff1 的局部线性趋势（小窗口） =====
             window_size = 5
@@ -385,7 +396,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'mid_diff1_trend_strength_lag{lag}'] = np.sign(k_d1) * r2_d1
 
             feat_dict[f'mid_diff1_price_move_capacity_lag{lag}'] = k_d1 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
-            feat_dict[f'mid_diff1_trend_liquidity_ratio__lag{lag}'] = np.sign(k_d1) * r2_d1 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
+            feat_dict[f'mid_diff1_trend_liquidity_ratio_lag{lag}'] = np.sign(k_d1) * r2_d1 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
 
             # 门控趋势特征：趋势筛选 + 趋势强度
             k_threshold = 0.000030
@@ -396,6 +407,23 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 (np.abs(k_d1) > k_threshold)
             ).astype(int)
             feat_dict[f'mid_diff1_trend_strength_gated_lag{lag}'] = feat_dict[f'mid_diff1_trend_strength_lag{lag}'] * feat_dict[f'mid_diff1_trend_regime_lag{lag}']
+
+            # ===== 真实量线性回归 =====
+            window_size = 5
+            real_volume_window = df['real_volume'].iloc[-lag+1-window_size:None if lag == 1 else -lag+1]
+            k_d1, r2_d1 = rolling_lr_k_r2(real_volume_window)
+            feat_dict[f'real_volume_lr_k_lag{lag}'] = k_d1
+            feat_dict[f'real_volume_lr_r2_lag{lag}'] = r2_d1
+            feat_dict[f'real_volume_trend_strength_lag{lag}'] = np.sign(k_d1) * r2_d1
+
+            feat_dict[f'real_volume_price_move_capacity_lag{lag}'] = k_d1 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
+            feat_dict[f'real_volume_trend_liquidity_ratio_lag{lag}'] = np.sign(k_d1) * r2_d1 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
+
+            feat_dict[f'real_volume_trend_regime_lag{lag}'] = (
+                (r2_d1 > r2_threshold) &
+                (np.abs(k_d1) > k_threshold)
+            ).astype(int)
+            feat_dict[f'real_volume_trend_strength_gated_lag{lag}'] = feat_dict[f'real_volume_trend_strength_lag{lag}'] * feat_dict[f'real_volume_trend_regime_lag{lag}']
 
             # ===== 多尺度中间价线性趋势 =====
             lr_windows = [10, 30, 60]  # window_size=30前面已经算过
@@ -485,17 +513,18 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        # x_extract1 = preprocess_slice(x_slice)
-        # print("x_extract1.shape: ", x_extract1.shape)
-        # x_extract2 = preprocess_local(x_slice, is_slice=True)
-        # print("x_extract2.shape: ", x_extract2.shape)
-        # # 对列排序
-        # x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
-        # x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
-        # x_extract1.to_csv("x_extract1.csv", index=True)
-        # x_extract2.to_csv("x_extract2.csv", index=True)
-        # compare_dfs(x_extract1, x_extract2)
-        # exit(0)
+        # TODO:
+        x_extract1 = preprocess_slice(x_slice)
+        print("x_extract1.shape: ", x_extract1.shape)
+        x_extract2 = preprocess_local(x_slice, is_slice=True)
+        print("x_extract2.shape: ", x_extract2.shape)
+        # 对列排序
+        x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
+        x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
+        x_extract1.to_csv("x_extract1.csv", index=True)
+        x_extract2.to_csv("x_extract2.csv", index=True)
+        compare_dfs(x_extract1, x_extract2)
+        exit(0)
 
         if is_local==False:
             # 方法一
@@ -548,7 +577,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         "vol1_rel_diff", "vol3_rel_diff", "vol5_rel_diff", 
         'relative_bid_density1', 'relative_bid_density2', 'relative_bid_density3', 
         'relative_ask_density1', 'relative_ask_density2', 'relative_ask_density3',
-        'real_volume', 'price_volume_ratio', 'real_volume_diff1'
+        'real_volume', 'price_volume_ratio',
     ]
 
     # 高阶特征
@@ -576,6 +605,13 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'mid_price_min5', 'mid_price_min20', 'mid_price_min50', 'mid_price_min100',
         'mid_price_max_min5', 'mid_price_max_min20', 'mid_price_max_min50', 'mid_price_max_min100',
         'pos_5', 'pos_20', 'pos_50', 'pos_100', 
+        'real_volume_ma5', 'real_volume_ma20', 'real_volume_ma50', 'real_volume_ma100', 
+        'real_volume_std5', 'real_volume_std20', 'real_volume_std50', 'real_volume_std100', 
+        'real_volume_vol_ratio5', 'real_volume_vol_ratio20', 'real_volume_vol_ratio50', 'real_volume_vol_ratio100', 
+        'real_volume_max5', 'real_volume_max20', 'real_volume_max50', 'real_volume_max100', 
+        'real_volume_min5', 'real_volume_min20', 'real_volume_min50', 'real_volume_min100', 
+        'real_volume_max_min5', 'real_volume_max_min20', 'real_volume_max_min50', 'real_volume_max_min100', 
+        'real_volume_pos_5', 'real_volume_pos_20', 'real_volume_pos_50', 'real_volume_pos_100', 
         # 'ask1_ma5', 'ask1_ma10', 'ask1_ma20', 'ask1_ma40', 
         # 'bid1_ma5', 'bid1_ma10', 'bid1_ma20', 'bid1_ma40', 
         'mid_diff1_lr_k', 'mid_diff1_lr_r2', 'mid_diff1_trend_strength',
@@ -607,9 +643,12 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'bsize1_delta10', 'bsize3_delta10', 'bsize5_delta10',
         'asize1_delta40', 'asize3_delta40', 'asize5_delta40',
         'bsize1_delta40', 'bsize3_delta40', 'bsize5_delta40',
+        'real_volume_delta1', 'real_volume_delta10', 'real_volume_delta40',
         'original_price',
         "mid_diff1_sum", "mid_diff1_open_close", "SignedTrendEff", 
-        "real_volume_lr_k", "real_volume_lr_r2"
+        "real_volume_lr_k", "real_volume_lr_r2", "real_volume_trend_strength", 
+        "real_volume_price_move_capacity", "real_volume_trend_liquidity_ratio", 
+        "real_volume_trend_regime", "real_volume_trend_strength_gated", 
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -720,6 +759,13 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             'vol5_rel_diff': (df['n_bsize1'] + df['n_bsize2'] + df['n_bsize3'] + df['n_bsize4'] + df['n_bsize5'] - df['n_asize1'] - df['n_asize2'] - df['n_asize3'] - df['n_asize4'] - df['n_asize5']) / (df['n_bsize1'] + df['n_bsize2'] + df['n_bsize3'] + df['n_bsize4'] + df['n_bsize5'] + df['n_asize1'] + df['n_asize2'] + df['n_asize3'] + df['n_asize4'] + df['n_asize5']),
         })
 
+        # 真实成交量特征
+        extra_feats['real_volume'] = np.log1p(df['amount_delta'] / (extra_feats['mid_price'] + 1e-10))
+        # 成交量与价格的比值（反映每单位价格变化的成交量变化）
+        extra_feats['price_volume_ratio'] = extra_feats['mid_price'] / (extra_feats['real_volume'] + 1e-10)
+        # # 成交量的前向差分（反映成交量的变化趋势）
+        # extra_feats['real_volume_diff1'] = extra_feats['real_volume'].diff().fillna(0)
+
         # 均线特征
         for w in [5, 20, 50, 100]:
             # extra_feats[f'ask1_ma{w}'] = extra_feats['ask1'].rolling(w, min_periods=1).mean()
@@ -740,6 +786,15 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             extra_feats[f'mid_price_min{w}'] = extra_feats['mid_price'].rolling(w, min_periods=1).min()
             extra_feats[f'mid_price_max_min{w}'] = extra_feats[f'mid_price_max{w}'] - extra_feats[f'mid_price_min{w}']
             extra_feats[f'pos_{w}'] = (extra_feats['mid_price'] -  extra_feats[f'mid_price_min{w}']) / (extra_feats[f'mid_price_max{w}'] -  extra_feats[f'mid_price_min{w}'] + 1e-10)
+                
+            extra_feats[f'real_volume_ma{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).mean()
+            extra_feats[f'real_volume_std{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).std()
+            extra_feats[f'real_volume_vol_ratio{w}'] = extra_feats[f'real_volume_std{w}'] / (extra_feats[f'real_volume_ma{w}'] + 1e-10)
+    
+            extra_feats[f'real_volume_max{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).max()
+            extra_feats[f'real_volume_min{w}'] = extra_feats['real_volume'].rolling(w, min_periods=1).min()
+            extra_feats[f'real_volume_max_min{w}'] = extra_feats[f'real_volume_max{w}'] - extra_feats[f'real_volume_min{w}']
+            extra_feats[f'real_volume_pos_{w}'] = (extra_feats['real_volume'] -  extra_feats[f'real_volume_min{w}']) / (extra_feats[f'real_volume_max{w}'] -  extra_feats[f'real_volume_min{w}'] + 1e-10)
 
         # 加权中间价
         extra_feats.update({
@@ -764,6 +819,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
                 f'midprice_delta{w}': extra_feats['mid_price'] - extra_feats['mid_price'].shift(w), 
                 f'close_delta{w}': df['n_close'] - df['n_close'].shift(w), 
                 f'amount_delta{w}': extra_feats['amount'] - extra_feats['amount'].shift(w),
+                f'real_volume_delta{w}': extra_feats['real_volume'] - extra_feats["real_volume"].shift(w)
             })
             for i in [1, 3, 5]:
                 extra_feats.update({
@@ -920,17 +976,22 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             (df['mid_diff1'] > 0).astype(int) * (df['amount'].diff() < 0).astype(int)
         )
         extra_feats['amount_price_div'] = df['mid_diff1'] / (df['amount'] + 1e-10)
-
-        # 真实成交量特征
-        extra_feats['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
-        # 成交量与价格的比值（反映每单位价格变化的成交量变化）
-        extra_feats['price_volume_ratio'] = df['mid_price'] / (extra_feats['real_volume'] + 1e-6)
-        # 成交量的前向差分（反映成交量的变化趋势）
-        extra_feats['real_volume_diff1'] = extra_feats['real_volume'].diff().fillna(0)
+        
         # real_volume线性回归
-        k, r2 = rolling_lr_features(extra_feats['real_volume'].to_numpy(), window=20)
+        k, r2 = rolling_lr_features(df['real_volume'].to_numpy(), window=5)
         extra_feats['real_volume_lr_k'] = k   # 斜率
         extra_feats['real_volume_lr_r2'] = r2   # 拟合优度
+        
+        extra_feats[f'real_volume_trend_strength'] = np.sign(k) * r2
+
+        extra_feats[f'real_volume_price_move_capacity'] = k / (df['relative_spread1'] + 1e-10)
+        extra_feats[f'real_volume_trend_liquidity_ratio'] = np.sign(k) * r2 / (df['relative_spread1'] + 1e-10)
+
+        extra_feats[f'real_volume_trend_regime'] = (
+            (r2 > r2_threshold) &
+            (np.abs(k) > k_threshold)
+        ).astype(int)
+        extra_feats[f'real_volume_trend_strength_gated'] = extra_feats[f'real_volume_trend_strength'] * extra_feats[f'real_volume_trend_regime']
         
         df = pd.concat([df, pd.DataFrame(extra_feats, index=df.index)], axis=1)
 

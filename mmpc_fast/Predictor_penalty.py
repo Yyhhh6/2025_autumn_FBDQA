@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_210527.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_235444.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -22,7 +22,7 @@ class Predictor():
         x_hat = self.preprocess(x)
 
         y = []
-        target_confidence = 0.75
+        target_confidence = 0.8
         y_pred = self.model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
@@ -103,7 +103,7 @@ def split_df_sliding(df: pd.DataFrame, window=100):
     return xs
 
 
-def compare_dfs(df1, df2, tol=1e-5):
+def compare_dfs(df1, df2, tol=1e-8):
     # --- 统一转成 DataFrame ---
     if isinstance(df1, pd.Series):
         df1 = df1.to_frame()
@@ -152,6 +152,7 @@ def compare_dfs(df1, df2, tol=1e-5):
         return diff_df
     return None
 
+
 def preprocess_slice(x: list[pd.DataFrame]):
     # 只处理 100 个tick
     x_extract = []
@@ -176,7 +177,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
         # df['amount'] = np.log1p(df['amount_delta'])
 
         # 真实成交量
-        df['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
+        df['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-10)
 
         # ********************下面用循环的方法计算差分好像更快********************
         mid_price = df['mid_price'].to_numpy()
@@ -208,7 +209,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 feat_dict[f'bid{i}_lag{lag}'] = row[f'n_bid{i}'] + 1
                 feat_dict[f'ask{i}_lag{lag}'] = row[f'n_ask{i}'] + 1
 
-            # 价格 & 价差 & 相对价差z
+            # 价格 & 价差 & 相对价差
             feat_dict[f'mid_price_lag{lag}'] = row["mid_price"]
             for i in range(1, 4):
                 feat_dict[f'spread{i}_lag{lag}'] = feat_dict[f'ask{i}_lag{lag}'] - feat_dict[f'bid{i}_lag{lag}']
@@ -243,8 +244,8 @@ def preprocess_slice(x: list[pd.DataFrame]):
             b3 = feat_dict[f'bsize1_lag{lag}'] + feat_dict[f'bsize2_lag{lag}'] + feat_dict[f'bsize3_lag{lag}']
             a3 = feat_dict[f'asize1_lag{lag}'] + feat_dict[f'asize2_lag{lag}'] + feat_dict[f'asize3_lag{lag}']
 
-            obi_1 = (b1 - a1) / (b1 + a1 + 1e-6)
-            obi_3 = (b3 - a3) / (b3 + a3 + 1e-6)
+            obi_1 = (b1 - a1) / (b1 + a1 + 1e-10)
+            obi_3 = (b3 - a3) / (b3 + a3 + 1e-10)
 
             feat_dict[f'obi_1_lag{lag}'] = obi_1
             feat_dict[f'obi_3_lag{lag}'] = obi_3
@@ -257,7 +258,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 真实成交量特征
             feat_dict[f'real_volume_lag{lag}'] = row['real_volume']
             # 成交量与价格的比值（反映每单位价格变化的成交量变化）
-            feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-6)
+            feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-10)
             # 成交量的前向差分（反映成交量的变化趋势）
             feat_dict[f'real_volume_diff1_lag{lag}'] = df.iloc[-lag]["real_volume"] - df.iloc[-lag-1]["real_volume"]  
 
@@ -277,7 +278,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # feat_dict[f'price_up_amount_down_lag{lag}'] = (
             #     int(row['mid_diff1'] > 0) * int(row['amount'] < df['amount'].iloc[-lag-1])
             # )
-            # feat_dict[f'amount_price_div_lag{lag}'] = row['mid_diff1'] / (row['amount'] + 1e-6)
+            # feat_dict[f'amount_price_div_lag{lag}'] = row['mid_diff1'] / (row['amount'] + 1e-10)
 
             # 一阶 / 二阶差分（注意边界）
             feat_dict[f'mid_diff1_lag{lag}'] = df.iloc[-lag]["mid_price"] - df.iloc[-lag-1]["mid_price"]
@@ -289,7 +290,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'price_up_amount_down_lag{lag}'] = (
                 int(feat_dict[f'mid_diff1_lag{lag}'] > 0) * int(feat_dict[f'amount_lag{lag}'] < np.log1p(df['amount_delta'].iloc[-lag-1]))
             )
-            feat_dict[f'amount_price_div_lag{lag}'] = feat_dict[f'mid_diff1_lag{lag}'] / (feat_dict[f'amount_lag{lag}'] + 1e-6)
+            feat_dict[f'amount_price_div_lag{lag}'] = feat_dict[f'mid_diff1_lag{lag}'] / (feat_dict[f'amount_lag{lag}'] + 1e-10)
 
             lag_feats.update(feat_dict)
 
@@ -357,7 +358,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
                     feat_dict[f'bsize{i}_delta{w}_lag{lag}'] = feat_dict[f'bsize{i}_lag{lag}'] - np.log1p(df[f'n_bsize{i}'].iloc[-lag-w])
 
             # 均线特征（只对ask1, bid1, mid_price计算）
-            for w in [5, 20, 50]:
+            for w in [5, 20, 50, 100]:
                 feat_dict[f'mid_price_ma{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_price_std{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
                 feat_dict[f'mid_diff1_std{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
@@ -368,7 +369,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
                 high = prices.max()
                 low = prices.min()
-                pos = (row['mid_price'] - low) / (high - low + 1e-6)
+                pos = (row['mid_price'] - low) / (high - low + 1e-10)
 
                 feat_dict[f'high_{w}_lag{lag}'] = high
                 feat_dict[f'low_{w}_lag{lag}'] = low
@@ -385,8 +386,8 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'mid_lr_r2_lag{lag}'] = r2_30
             feat_dict[f'mid_trend_strength_lag{lag}'] = np.sign(k_30) * r2_30
 
-            feat_dict[f'price_move_capacity_lag{lag}'] = k_30 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-6)
-            feat_dict[f'trend_liquidity_ratio_lag{lag}'] = np.sign(k_30) * r2_30 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-6)
+            feat_dict[f'price_move_capacity_lag{lag}'] = k_30 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
+            feat_dict[f'trend_liquidity_ratio_lag{lag}'] = np.sign(k_30) * r2_30 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
 
             # ===== mid_diff1 的局部线性趋势（小窗口） =====
             window_size = 5
@@ -829,8 +830,8 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         df['mid_trend_strength_60'] = np.sign(k_60) * r2_60
 
         # 盘口是否允许价格往某个方向动？
-        df['price_move_capacity'] = df['mid_lr_k'] / (df['relative_spread1'] + 1e-6)
-        df['trend_liquidity_ratio'] = df['mid_trend_strength'] / (df['relative_spread1'] + 1e-6)
+        df['price_move_capacity'] = df['mid_lr_k'] / (df['relative_spread1'] + 1e-10)
+        df['trend_liquidity_ratio'] = df['mid_trend_strength'] / (df['relative_spread1'] + 1e-10)
 
         # 过去20、50、100个数据中的最高价和最低价
         df['high_20'] = df['mid_price'].rolling(window=20, min_periods=1).max()
@@ -841,9 +842,9 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         df['low_100'] = df['mid_price'].rolling(window=100, min_periods=1).min()
 
         # 相对位置
-        df['pos_20'] = (df['mid_price'] - df['low_20']) / (df['high_20'] - df['low_20'] + 1e-6)
-        df['pos_50'] = (df['mid_price'] - df['low_50']) / (df['high_50'] - df['low_50'] + 1e-6)
-        df['pos_100'] = (df['mid_price'] - df['low_100']) / (df['high_100'] - df['low_100'] + 1e-6)
+        df['pos_20'] = (df['mid_price'] - df['low_20']) / (df['high_20'] - df['low_20'] + 1e-10)
+        df['pos_50'] = (df['mid_price'] - df['low_50']) / (df['high_50'] - df['low_50'] + 1e-10)
+        df['pos_100'] = (df['mid_price'] - df['low_100']) / (df['high_100'] - df['low_100'] + 1e-10)
 
         # # 时间衰减盘口特征
         # decay = np.exp(-np.arange(100)[::-1] / 20)  # 越近权重越大
@@ -858,13 +859,13 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         # df['asize1_decay'] = df['asize1'].rolling(100, min_periods=1).apply(decay_mean, raw=True)
         
         # 盘口不平衡
-        df['obi_1'] = (df['bsize1'] - df['asize1']) / (df['bsize1'] + df['asize1'] + 1e-6)
+        df['obi_1'] = (df['bsize1'] - df['asize1']) / (df['bsize1'] + df['asize1'] + 1e-10)
         df['obi_3'] = (
             df['bsize1'] + df['bsize2'] + df['bsize3']
             - df['asize1'] - df['asize2'] - df['asize3']
         ) / (
             df['bsize1'] + df['bsize2'] + df['bsize3']
-            + df['asize1'] + df['asize2'] + df['asize3'] + 1e-6
+            + df['asize1'] + df['asize2'] + df['asize3'] + 1e-10
         )
 
         # 盘口不对称强度（引入非线性信号给树模型试试）
@@ -892,12 +893,12 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         extra_feats['price_up_amount_down'] = (
             (df['mid_diff1'] > 0).astype(int) * (df['amount'].diff() < 0).astype(int)
         )
-        extra_feats['amount_price_div'] = df['mid_diff1'] / (df['amount'] + 1e-6)
+        extra_feats['amount_price_div'] = df['mid_diff1'] / (df['amount'] + 1e-10)
 
         # 真实成交量特征
-        extra_feats['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
+        extra_feats['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-10)
         # 成交量与价格的比值（反映每单位价格变化的成交量变化）
-        extra_feats['price_volume_ratio'] = df['mid_price'] / (extra_feats['real_volume'] + 1e-6)
+        extra_feats['price_volume_ratio'] = df['mid_price'] / (extra_feats['real_volume'] + 1e-10)
         # 成交量的前向差分（反映成交量的变化趋势）
         extra_feats['real_volume_diff1'] = extra_feats['real_volume'].diff().fillna(0)
         # real_volume线性回归
