@@ -276,49 +276,49 @@ if __name__ == "__main__":
     print("===============================")
 
     for N in N_list:
-        # 划分训练集、验证集、测试集
-        train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+    #     # 划分训练集、验证集、测试集
+    #     train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
-        print("train_files: ", train_files)
-        print("val_files: ", val_files)
-        print("test_files: ", test_files)
+    #     print("train_files: ", train_files)
+    #     print("val_files: ", val_files)
+    #     print("test_files: ", test_files)
 
-        # 提取训练集、验证集、测试集的特征
-        train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
-        val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
+    #     # 提取训练集、验证集、测试集的特征
+    #     train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
+    #     val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
 
-        print("train_data.shape: ", train_data.shape)
+    #     print("train_data.shape: ", train_data.shape)
         
-        model = XGBModel()
-        model.train(
-            train_data,
-            train_labels,
-            val_data,
-            val_labels,
-            num_boost_round=args.num_boost_round,
-            early_stopping_rounds=args.early_stopping_rounds,
-            N=N,
-            weight1=args.weight1,
-            weight2=args.weight2,
-            weight3=args.weight3,
-            max_depth=args.max_depth,
-            subsample=args.subsample,
-            colsample_bytree=args.colsample_bytree,
-            min_child_weight=args.min_child_weight,
-            gamma=args.gamma,
-            save_path=args.save_path,
-            sym=args.sym,
-            penalty_scale=args.penalty_scale,
-            train_profits=train_profits
-        )
+    #     model = XGBModel()
+    #     model.train(
+    #         train_data,
+    #         train_labels,
+    #         val_data,
+    #         val_labels,
+    #         num_boost_round=args.num_boost_round,
+    #         early_stopping_rounds=args.early_stopping_rounds,
+    #         N=N,
+    #         weight1=args.weight1,
+    #         weight2=args.weight2,
+    #         weight3=args.weight3,
+    #         max_depth=args.max_depth,
+    #         subsample=args.subsample,
+    #         colsample_bytree=args.colsample_bytree,
+    #         min_child_weight=args.min_child_weight,
+    #         gamma=args.gamma,
+    #         save_path=args.save_path,
+    #         sym=args.sym,
+    #         penalty_scale=args.penalty_scale,
+    #         train_profits=train_profits
+    #     )
 
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_ZZZ/model_20_all_20251229_102049.json")
-        data_dir = "data/data_sym_test"
-        # data_dir = "data/data_sym0_test"
+        model = XGBModel("models_ZZZ/model_20_all_20251229_102049.json")
+        # data_dir = "data/data_sym_test"
+        data_dir = "data/data_sym0_test"
         # data_dir = "data/data_sym0_test_select"
         test_files2 = [
             os.path.join(data_dir, f)
@@ -328,8 +328,8 @@ if __name__ == "__main__":
         ]
         print("test_files2: ", test_files2)
 
-        test(test_files2, N=N, model=model)   # 本地最快评测
-        # test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
+        # test(test_files2, N=N, model=model)   # 本地最快评测
+        test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
         # test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")
