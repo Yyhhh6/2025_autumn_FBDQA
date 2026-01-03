@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_20251226_205657.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_235444.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -22,7 +22,7 @@ class Predictor():
         x_hat = self.preprocess(x)
 
         y = []
-        target_confidence = 0.75
+        target_confidence = 0.8
         y_pred = self.model.predict(x_hat)   # (N, 3)
         confidence = np.max(y_pred, axis=1)
         signal = np.argmax(y_pred, axis=1)
@@ -176,6 +176,9 @@ def preprocess_slice(x: list[pd.DataFrame]):
         # df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
         # df['amount'] = np.log1p(df['amount_delta'])
 
+        # 真实成交量
+        df['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
+
         # ********************下面用循环的方法计算差分好像更快********************
         mid_price = df['mid_price'].to_numpy()
         mid_diff1 = np.empty_like(mid_price)
@@ -252,6 +255,13 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'bid_depth_slope_lag{lag}'] = (feat_dict[f'bsize5_lag{lag}'] - feat_dict[f'bsize1_lag{lag}']) / 4
             feat_dict[f'ask_depth_slope_lag{lag}'] = (feat_dict[f'asize5_lag{lag}'] - feat_dict[f'asize1_lag{lag}']) / 4
 
+            # 真实成交量特征
+            feat_dict[f'real_volume_lag{lag}'] = row['real_volume']
+            # 成交量与价格的比值（反映每单位价格变化的成交量变化）
+            feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-6)
+            # 成交量的前向差分（反映成交量的变化趋势）
+            feat_dict[f'real_volume_diff1_lag{lag}'] = df.iloc[-lag]["real_volume"] - df.iloc[-lag-1]["real_volume"]  
+
             lag_feats.update(feat_dict)
 
         for lag in lags2:
@@ -310,14 +320,6 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
             # 还原原始股价
             feat_dict[f'original_price_lag{lag}'] = sym_to_price[row['sym']]
-
-            # 股价分类
-            feat_dict[f'sym_class_lag{lag}'] = (
-                0 if feat_dict[f'original_price_lag{lag}'] < 100 else 
-                1 if feat_dict[f'original_price_lag{lag}'] < 699 else 
-                2 if feat_dict[f'original_price_lag{lag}'] < 1500 else 
-                3             
-            )
 
             # 真趋势” vs “来回波动
             feat_dict[f'mid_diff1_open_close_lag{lag}'] = mid_diff1_open_close
@@ -483,11 +485,8 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        # # TODO:
         # x_extract1 = preprocess_slice(x_slice)
         # print("x_extract1.shape: ", x_extract1.shape)
-        # # print("x_extract1['mid_lr_k_lag1']: ", x_extract1["mid_lr_k_lag1"])
-        # # print("x_extract1['mid_lr_r2_lag1']: ", x_extract1["mid_lr_r2_lag1"])
         # x_extract2 = preprocess_local(x_slice, is_slice=True)
         # print("x_extract2.shape: ", x_extract2.shape)
         # # 对列排序
@@ -503,7 +502,7 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
             x_extract = preprocess_slice(x_slice)
         else:
             # 方法二
-            x_extract, _label = preprocess_local(x_slice, is_train=True, is_slice=True)
+            x_extract, _label, _ = preprocess_local(x_slice, is_train=True, is_slice=True)
             compare_dfs(label, _label)  # 二者相同！说明没问题
 
         assert len(x_extract) == len(label), f"len(x_extract): {len(x_extract)}    len(label): {len(label)}"
@@ -549,10 +548,11 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         "vol1_rel_diff", "vol3_rel_diff", "vol5_rel_diff", 
         'relative_bid_density1', 'relative_bid_density2', 'relative_bid_density3', 
         'relative_ask_density1', 'relative_ask_density2', 'relative_ask_density3',
+        'real_volume', 'price_volume_ratio', 'real_volume_diff1'
     ]
 
     # 高阶特征
-    # lags2 = [1, 2, 5]
+    lags2 = [1, 2, 5]
     lags2 = [1]
     raw_cols2 = [
         'mid_diff1', 
@@ -591,6 +591,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'mid_lr_k_10', 'mid_lr_r2_10', 'mid_trend_strength_10', 
         'mid_lr_k_30', 'mid_lr_r2_30', 'mid_trend_strength_30', 
         'mid_lr_k_60', 'mid_lr_r2_60', 'mid_trend_strength_60',
+        # # 'bid1_decay', 'ask1_decay', 'spread_decay', 'bsize1_decay', 'asize1_decay',
         "close_delta1", "amount_delta1", "close_delta10", "amount_delta10", "close_delta40", "amount_delta40", 
         "midprice_delta1", "midprice_delta10", "midprice_delta40",
         "midprice_delta_rate1", "midprice_delta_rate10", "midprice_delta_rate40", 
@@ -606,8 +607,9 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'bsize1_delta10', 'bsize3_delta10', 'bsize5_delta10',
         'asize1_delta40', 'asize3_delta40', 'asize5_delta40',
         'bsize1_delta40', 'bsize3_delta40', 'bsize5_delta40',
-        'original_price', 'sym_class',
+        'original_price',
         "mid_diff1_sum", "mid_diff1_open_close", "SignedTrendEff", 
+        "real_volume_lr_k", "real_volume_lr_r2"
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -618,6 +620,9 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         for df in x:
             labels.append(df['label_20'][99:])
         label = pd.concat(labels, axis=0).reset_index(drop=True)
+
+        profit = np.concatenate([(df['n_midprice'].shift(-20) - df['n_midprice']).fillna(0).values for df in x], axis=0).astype(np.float32)
+        profit = np.ascontiguousarray(profit[99:]) # 现在如果买入，N步后盈利多少
 
     # 带进度条
     for i, df in tqdm(
@@ -682,19 +687,6 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             9: 1740,
         }
         extra_feats['original_price'] = df['sym'].map(sym_to_price)
-
-        # 股价分类
-        def price_to_class(price):
-            if price < 100:
-                return 0
-            elif price < 699:
-                return 1
-            elif price < 1500:
-                return 2
-            else:
-                return 3
-
-        extra_feats['sym_class'] = extra_feats['original_price'].map(price_to_class)
 
         # 对数盘口量 & 成交量
         for i in range(1, 6):
@@ -929,6 +921,17 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         )
         extra_feats['amount_price_div'] = df['mid_diff1'] / (df['amount'] + 1e-10)
 
+        # 真实成交量特征
+        extra_feats['real_volume'] = df['amount_delta'] / (df['mid_price'] + 1e-6)
+        # 成交量与价格的比值（反映每单位价格变化的成交量变化）
+        extra_feats['price_volume_ratio'] = df['mid_price'] / (extra_feats['real_volume'] + 1e-6)
+        # 成交量的前向差分（反映成交量的变化趋势）
+        extra_feats['real_volume_diff1'] = extra_feats['real_volume'].diff().fillna(0)
+        # real_volume线性回归
+        k, r2 = rolling_lr_features(extra_feats['real_volume'].to_numpy(), window=20)
+        extra_feats['real_volume_lr_k'] = k   # 斜率
+        extra_feats['real_volume_lr_r2'] = r2   # 拟合优度
+        
         df = pd.concat([df, pd.DataFrame(extra_feats, index=df.index)], axis=1)
 
         # 时间衰减采样历史数据
@@ -965,6 +968,6 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     concat_df = concat_df[sorted(concat_df.columns)]
 
     if is_train:
-        return concat_df, label
+        return concat_df, label, profit
     else:
         return concat_df

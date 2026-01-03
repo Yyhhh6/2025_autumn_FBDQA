@@ -90,12 +90,16 @@ def extract_feature(files_dir, N):
 
 if __name__ == "__main__":
     for N in N_list:
-        train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
-        test_files = ['./data/data_sym9/snapshot_sym9_date9_am.csv', './data/data_sym9/snapshot_sym9_date68_pm.csv', './data/data_sym9/snapshot_sym9_date36_pm.csv', './data/data_sym9/snapshot_sym9_date34_pm.csv', './data/data_sym9/snapshot_sym9_date1_pm.csv', './data/data_sym9/snapshot_sym9_date12_pm.csv', './data/data_sym9/snapshot_sym9_date13_am.csv', './data/data_sym9/snapshot_sym9_date59_am.csv', './data/data_sym9/snapshot_sym9_date1_am.csv', './data/data_sym9/snapshot_sym9_date72_pm.csv', './data/data_sym9/snapshot_sym9_date21_am.csv', './data/data_sym9/snapshot_sym9_date25_pm.csv', './data/data_sym9/snapshot_sym9_date35_pm.csv', './data/data_sym9/snapshot_sym9_date38_am.csv', './data/data_sym9/snapshot_sym9_date41_am.csv', './data/data_sym9/snapshot_sym9_date12_am.csv', './data/data_sym9/snapshot_sym9_date22_am.csv']
+        # train_files, val_files, test_files = split_csv_files(data_dir=file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+        # test_files = ['./data/data_sym9/snapshot_sym9_date9_am.csv', './data/data_sym9/snapshot_sym9_date68_pm.csv', './data/data_sym9/snapshot_sym9_date36_pm.csv', './data/data_sym9/snapshot_sym9_date34_pm.csv', './data/data_sym9/snapshot_sym9_date1_pm.csv', './data/data_sym9/snapshot_sym9_date12_pm.csv', './data/data_sym9/snapshot_sym9_date13_am.csv', './data/data_sym9/snapshot_sym9_date59_am.csv', './data/data_sym9/snapshot_sym9_date1_am.csv', './data/data_sym9/snapshot_sym9_date72_pm.csv', './data/data_sym9/snapshot_sym9_date21_am.csv', './data/data_sym9/snapshot_sym9_date25_pm.csv', './data/data_sym9/snapshot_sym9_date35_pm.csv', './data/data_sym9/snapshot_sym9_date38_am.csv', './data/data_sym9/snapshot_sym9_date41_am.csv', './data/data_sym9/snapshot_sym9_date12_am.csv', './data/data_sym9/snapshot_sym9_date22_am.csv']
+        test_dir = "./data/data_sym7_test"
+        test_files = [
+            os.path.join(test_dir, f) for f in os.listdir(test_dir) if f.endswith(".csv")
+        ]
         test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=N)
         # print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}, n_midprice shape: {n_midprice.shape}")
         print(f"test_data shape: {test_data.shape}, test_labels shape: {test_labels.shape}")
-        model = XGBModel("/hdd/yyh/src/quant/mmpc/model_20_sym9_20251229_163627.json")
+        model = XGBModel("/hdd/yyh/src/quant/mmpc/model_20_sym7_20251231_072506.json")
         # print(f"the 1st test sample ground truth: {test_labels[0]}, {test_data[0].shape}")
         y_pred = model.predict(test_data)   # (N, 3)
 

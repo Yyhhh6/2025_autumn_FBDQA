@@ -248,7 +248,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_path", type=str, default="./models_ZZZ_Penalty/", help="save_path")
 
     parser.add_argument("--sym", type=str, default="all", help="sym identifier")
-    parser.add_argument("--penalty_scale", type=float, default=5.0, help="penalty_scale for custom loss")
+    parser.add_argument("--penalty_scale", type=float, default=10.0, help="penalty_scale for custom loss")
     args = parser.parse_args()
 
     # 打印参数
@@ -309,8 +309,9 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_ZZZ_0/model_20_all_20251231_165909.json")
+        # model = XGBModel("models_ZZZ_Penalty/model_20_all_20260102_210527.json")
         data_dir = "data/data_sym_test"
+        # data_dir = "data/data_000"
         # data_dir = "data/data_sym0_test"
         # data_dir = "data/data_sym0_test_select"
         test_files2 = [
@@ -323,6 +324,6 @@ if __name__ == "__main__":
 
         test(test_files2, N=N, model=model)   # 本地最快评测
         test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
-        test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
+        # test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")

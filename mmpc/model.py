@@ -102,13 +102,12 @@ class XGBModel:
             "seed": seed,
         }
         dtrain = xgb.DMatrix(X_train, label=y_train)
-        # dtrain = xgb.QuantileDMatrix(X_train, label=y_train)
 
-        # evals = [(dtrain, "train")]
         if X_valid is not None and y_valid is not None:
             dvalid = xgb.DMatrix(X_valid, label=y_valid)
-            # dvalid = xgb.QuantileDMatrix(X_valid, label=y_valid)
+            dvalid = xgb.DMatrix(X_valid, label=y_valid)
             evals = [(dvalid, "valid")]
+
         from xgboost.callback import EarlyStopping
 
         es = EarlyStopping(
@@ -127,16 +126,10 @@ class XGBModel:
             callbacks=[es],
             verbose_eval=50,
         )
-
-        # best_iter = self.model.best_iteration
-        # self.model.set_attr(best_iteration=str(best_iter))
-
-        # 确保保存目录存在
         os.makedirs(save_path, exist_ok=True)
 
-        # 生成时间戳
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(save_path, f"model_{N}_{sym}_{timestamp}.json")
+        filename = os.path.join(save_path, f"model_{N}_sym{sym}_{timestamp}_{weight1}_{weight2}_{weight3}_{max_depth}_{subsample}_{colsample_bytree}_{min_child_weight}_{gamma}_{penalty_scale}.json")
         self.model.save_model(filename)
         print(f"Model for N={N} trained and saved.")
 

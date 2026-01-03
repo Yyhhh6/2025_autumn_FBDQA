@@ -1,20 +1,63 @@
 from .data_process import *
 from .model import XGBModel
-from .test import extract_feature
+# from .test import extract_feature
 import os
+from .Predictor import preprocess
+import os
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
 
-test_dir = "./data/data_sym1_test"
+def extract_feature(files_dir, N):
+    csv_files = files_dir
+    def process_file(file, N):
+        if os.path.exists(file):
+            df = pd.read_csv(file)#[:-N]
+            n_midprice = df['n_midprice'].values
+            amount_delta = df['amount_delta'].values
+            if df.empty:
+                raise ValueError(f"File {file} is empty.")
+            df = df.reset_index(drop=True)
+            df, labels, _ = preprocess(df, N)
+            df = df.squeeze(axis=0)
+            labels = labels[99:]
+            df_list = df[99:]
+            n_midprice = n_midprice[99:]
+        else:
+            print("file: ", file)
+            raise FileNotFoundError(f"File {file} not found.")
+        return df_list, labels, n_midprice, amount_delta
+
+    data = []
+    labels_list = []
+    midprice_list = []
+    amount_delta_list = []
+
+    for file in tqdm(csv_files, total=len(csv_files), desc="Extracting features"):
+        df, labels, n_midprice, amount_delta = process_file(file, N)
+        data.append(df)
+        labels_list.append(labels)
+        midprice_list.append(n_midprice)
+        amount_delta_list.append(amount_delta)
+    data = np.concatenate(data, axis=0)
+    labels_list = np.concatenate(labels_list, axis=0)
+    # midprice_list = np.concatenate(midprice_list, axis=0)
+    # amount_delta_list = np.concatenate(amount_delta_list, axis=0)
+
+    return data, labels_list, midprice_list, amount_delta_list
+
+test_dir = "./data/data_sym7_test"
 test_files = [
     os.path.join(test_dir, f) for f in os.listdir(test_dir) if f.endswith(".csv")
 ]
 model = XGBModel("qyh_fast/model_20_all_20260102_132520.json")
 
-test_data, test_labels, n_midprice = extract_feature(files_dir=test_files, N=20)
+test_data, test_labels, n_midprice, amount_delta = extract_feature(files_dir=test_files, N=20)
 
 y_pred = model.predict(test_data)   # (N, 3)
 confidence = np.max(y_pred, axis=1)
 signal = np.argmax(y_pred, axis=1)
-signal[confidence < 0.75] = 1
+signal[confidence < 0.65] = 1
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,8 +72,8 @@ def plot_prediction_results(mid_prices, signals, labels, start_idx=0, length=500
     mid_prices = np.concatenate(mid_prices, axis=0)
 
     # end_idx = len(mid_prices)
-    start_idx = 5500
-    end_idx = 7500
+    end_idx = 6000
+    start_idx = 4000
     prices = mid_prices[start_idx:end_idx]
     preds = signals[start_idx:end_idx]
     actuals = labels[start_idx:end_idx]
@@ -70,11 +113,11 @@ def plot_prediction_results(mid_prices, signals, labels, start_idx=0, length=500
     plt.ylabel("Price")
     plt.grid(True, alpha=0.2)
     plt.show()
-    plt.savefig("mmpc/prediction_results_part2.png", dpi=300)
+    plt.savefig("mmpc/amount_delta.png", dpi=300)
 
 # 调用函数进行绘图（假设 n_midprice, signal, test_labels 已经准备好）
 # 注意：确保 mid_price 的长度与 signal 一致
-plot_prediction_results(n_midprice, signal, test_labels, start_idx=1000, length=500)
+plot_prediction_results(amount_delta, signal, test_labels, start_idx=1000, length=500)
 
 index_recall = test_labels != 1
 recall = sum(signal[index_recall] == test_labels[index_recall]) / sum(index_recall)
