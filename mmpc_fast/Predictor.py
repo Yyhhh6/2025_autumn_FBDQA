@@ -319,6 +319,14 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 还原原始股价
             feat_dict[f'original_price_lag{lag}'] = sym_to_price[row['sym']]
 
+            # 股价分类
+            feat_dict[f'sym_class_lag{lag}'] = (
+                0 if feat_dict[f'original_price_lag{lag}'] < 100 else 
+                1 if feat_dict[f'original_price_lag{lag}'] < 699 else 
+                2 if feat_dict[f'original_price_lag{lag}'] < 1500 else 
+                3             
+            )
+
             # 真趋势” vs “来回波动
             feat_dict[f'mid_diff1_open_close_lag{lag}'] = mid_diff1_open_close
             feat_dict[f'mid_diff1_sum_lag{lag}'] = mid_diff1_sum
@@ -359,7 +367,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
                     feat_dict[f'asize{i}_delta{w}_lag{lag}'] = feat_dict[f'asize{i}_lag{lag}'] - np.log1p(df[f'n_asize{i}'].iloc[-lag-w])
                     feat_dict[f'bsize{i}_delta{w}_lag{lag}'] = feat_dict[f'bsize{i}_lag{lag}'] - np.log1p(df[f'n_bsize{i}'].iloc[-lag-w])
 
-            # 均线特征（只对ask1, bid1, mid_price计算）
+            # 窗口特征
             for w in [5, 20, 50, 100]:
                 feat_dict[f'mid_price_ma{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_price_std{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
@@ -513,18 +521,20 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        # TODO:
-        x_extract1 = preprocess_slice(x_slice)
-        print("x_extract1.shape: ", x_extract1.shape)
-        x_extract2 = preprocess_local(x_slice, is_slice=True)
-        print("x_extract2.shape: ", x_extract2.shape)
-        # 对列排序
-        x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
-        x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
-        x_extract1.to_csv("x_extract1.csv", index=True)
-        x_extract2.to_csv("x_extract2.csv", index=True)
-        compare_dfs(x_extract1, x_extract2)
-        exit(0)
+        # # TODO:
+        # x_extract1 = preprocess_slice(x_slice)
+        # print("x_extract1.shape: ", x_extract1.shape)
+        # # print("x_extract1['mid_lr_k_lag1']: ", x_extract1["mid_lr_k_lag1"])
+        # # print("x_extract1['mid_lr_r2_lag1']: ", x_extract1["mid_lr_r2_lag1"])
+        # x_extract2 = preprocess_local(x_slice, is_slice=True)
+        # print("x_extract2.shape: ", x_extract2.shape)
+        # # 对列排序
+        # x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
+        # x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
+        # x_extract1.to_csv("x_extract1.csv", index=True)
+        # x_extract2.to_csv("x_extract2.csv", index=True)
+        # compare_dfs(x_extract1, x_extract2)
+        # exit(0)
 
         if is_local==False:
             # 方法一
@@ -581,7 +591,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
     ]
 
     # 高阶特征
-    lags2 = [1, 2, 5]
+    # lags2 = [1, 2, 5]
     lags2 = [1]
     raw_cols2 = [
         'mid_diff1', 
@@ -644,7 +654,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'asize1_delta40', 'asize3_delta40', 'asize5_delta40',
         'bsize1_delta40', 'bsize3_delta40', 'bsize5_delta40',
         'real_volume_delta1', 'real_volume_delta10', 'real_volume_delta40',
-        'original_price',
+        'original_price', 'sym_class',
         "mid_diff1_sum", "mid_diff1_open_close", "SignedTrendEff", 
         "real_volume_lr_k", "real_volume_lr_r2", "real_volume_trend_strength", 
         "real_volume_price_move_capacity", "real_volume_trend_liquidity_ratio", 
@@ -726,6 +736,19 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             9: 1740,
         }
         extra_feats['original_price'] = df['sym'].map(sym_to_price)
+
+        # 股价分类
+        def price_to_class(price):
+            if price < 100:
+                return 0
+            elif price < 699:
+                return 1
+            elif price < 1500:
+                return 2
+            else:
+                return 3
+
+        extra_feats['sym_class'] = extra_feats['original_price'].map(price_to_class)
 
         # 对数盘口量 & 成交量
         for i in range(1, 6):
