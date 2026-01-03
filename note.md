@@ -10,6 +10,12 @@
 [Done] ./data/data_sym9: train=142, test=16
 Train / Test split (copy) and summary finished.
 
+tmp1：加上了很多量（成交额）价的特征，penalty = 100，早停150
+
+tmp2：早停改为200
+
+
+
 ## 分sym、参数搜索pipeline
 1. bash run.sh：修改想要搜索的参数组合
 2. python select_from_output.py：从output日志中选出最优参数组合，生成model_config.json

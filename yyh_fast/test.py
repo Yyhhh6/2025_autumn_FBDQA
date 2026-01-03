@@ -1,5 +1,5 @@
 from .model import XGBModel
-from .Predictor import preprocess
+from .Predictor import preprocess_slice as preprocess
 from .data_process import *
 import os
 import numpy as np
@@ -21,7 +21,7 @@ SEED = 42
 # N_list = [5, 10, 20, 40, 60]
 N_list = [20]
 alpha_map = {5: 0.0005, 10: 0.0005, 20: 0.001, 40: 0.001, 60: 0.001}
-file_dir="data/data_sym_test"
+file_dir="data/data_sym0_test"
 
 def split_csv_files(
     data_dir,

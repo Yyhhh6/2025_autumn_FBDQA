@@ -317,9 +317,10 @@ if __name__ == "__main__":
         print("*"*50)
 
         # model = XGBModel("models_ZZZ/model_20_all_20251229_102049.json")
+        # model = XGBModel()
         data_dir = "data/data_sym_test"
         # data_dir = "data/data_sym0_test"
-        # data_dir = "data/data_sym0_test_select"
+        # data_dir = "data/data_000"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)

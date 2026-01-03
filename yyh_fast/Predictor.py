@@ -174,7 +174,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
         # 中间价一阶差分
         df['mid_price'] = 1 + df['n_midprice']
         # df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
-        # df['amount'] = np.log1p(df['amount_delta'])
+        df['amount'] = np.log1p(df['amount_delta'])
 
         # 真实成交量
         df['real_volume'] = np.log1p(df['amount_delta'] / (df['mid_price'] + 1e-10))
@@ -193,6 +193,10 @@ def preprocess_slice(x: list[pd.DataFrame]):
         mid_diff1_open_close = mid_price[-1] - mid_price[0]
         df['mid_diff1'] = mid_diff1
         # print("mid_diff1: ", mid_diff1)
+
+        # mid_price 和 amount 的联合特征
+        # Signed Log Money Flow (方向性对数资金流)
+        df['signed_amount'] = np.sign(df['mid_diff1']) * df['amount']
 
         # 用字典存每个lag的特征
         lag_feats = {}
@@ -260,6 +264,9 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'real_volume_lag{lag}'] = row['real_volume']
             # 成交量与价格的比值（反映每单位价格变化的成交量变化）
             feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-10)
+            
+            # mid_diff1 与 成交量 的关系特征
+            feat_dict[f'signed_amount_lag{lag}'] = row['signed_amount']
 
             lag_feats.update(feat_dict)
 
@@ -528,6 +535,36 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 np.sign(k_dict[60]) * r2_dict[60]
             )
 
+            # mid_diff1 与 成交量 的关系特征
+            # 对其做短周期平滑，捕捉“持续性流向”
+            feat_dict[f'signed_amount_ema5_lag{lag}'] = pd.Series(df['signed_amount'][-10:]).ewm(span=5).mean().iloc[-1]
+            # Price-Amount Elasticity (价格-成交额弹性)
+            # 衡量“推升价格的难度”。在趋势末端，往往成交额很大但价格动量减弱（背离）。
+            feat_dict[f'price_impact_efficiency_lag{lag}'] = df['mid_diff1'].iloc[-1] / (df['amount'].iloc[-1] + 1e-5)
+            
+            # Amount-Weighted Momentum (成交额加权动量)
+            # 相比纯价格动量，该指标能过滤掉“无量波动”产生的噪音
+            for w in [10, 30]:
+                # 逻辑：过去 W 个 tick 内，价格上涨时的成交额之和 vs 下跌时的成交额之和
+                pos_flow = (df['amount'] * (df['mid_diff1'] > 0)).rolling(w).sum()
+                neg_flow = (df['amount'] * (df['mid_diff1'] < 0)).rolling(w).sum()
+                feat_dict[f'net_amount_ratio_{w}_lag{lag}'] = ((pos_flow - neg_flow) / (pos_flow + neg_flow + 1e-10)).iloc[-1]
+
+            # Cumulative Signed Amount (累积方向性成交额)
+            feat_dict[f'cum_signed_amount_10_lag{lag}'] = df['signed_amount'].rolling(window=10).sum().iloc[-1]
+            feat_dict[f'cum_signed_amount_30_lag{lag}'] = df['signed_amount'].rolling(window=30).sum().iloc[-1]
+            for w in [20, 60]:
+                # 1. 价格与成交量的滚动相关性 (Trend Confirmation)
+                # 相关性趋近 -1 表示极度背离，趋近 1 表示量价同步。
+                # 这是树模型最喜欢的“交互特征”，能直接区分趋势的真伪。
+                feat_dict[f'pv_corr_{w}_lag{lag}'] = df['mid_diff1'].rolling(w).corr(df['amount']).mean()
+                # 2. 价格动量与量能分配的差值 (Z-Score Spread)
+                # 将价格变动幅度与对数成交额分别做 Z-Score，看谁跑得更快。
+                # 逻辑：如果 price_z 远大于 amount_z，说明是“无量空涨”。
+                price_z = (df['mid_diff1'] - df['mid_diff1'].rolling(w).mean()) / (df['mid_diff1'].rolling(w).std() + 1e-10)
+                amount_z = (df['amount'] - df['amount'].rolling(w).mean()) / (df['amount'].rolling(w).std() + 1e-10)
+                feat_dict[f'pv_z_spread_{w}_lag{lag}'] = (price_z - amount_z).iloc[-1]
+
             lag_feats.update(feat_dict)
 
         x_extract.append(lag_feats)
@@ -630,6 +667,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'relative_bid_density1', 'relative_bid_density2', 'relative_bid_density3', 
         'relative_ask_density1', 'relative_ask_density2', 'relative_ask_density3',
         'real_volume', 'price_volume_ratio',
+        "signed_amount",
     ]
 
     # 高阶特征
@@ -710,6 +748,8 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         "real_volume_vol_ratio_sl_5_50", 
         "mid_diff1_vol_ratio_sl_20_100", 
         "real_volume_vol_ratio_sl_20_100", 
+        "signed_amount_ema5", "price_impact_efficiency", "net_amount_ratio_10", "net_amount_ratio_30",
+        "pv_corr_20", "pv_corr_60", "pv_z_spread_20", "pv_z_spread_60", "cum_signed_amount_10", "cum_signed_amount_30"
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -1108,6 +1148,40 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         ).astype(int)
         extra_feats[f'real_volume_trend_strength_gated'] = extra_feats[f'real_volume_trend_strength'] * extra_feats[f'real_volume_trend_regime']
         
+        # mid_price 和 amount 的联合特征
+        # Signed Log Money Flow (方向性对数资金流)
+        extra_feats['signed_amount'] = np.sign(df['mid_diff1']) * df['amount']
+        # 对其做短周期平滑，捕捉“持续性流向”
+        extra_feats['signed_amount_ema5'] = pd.Series(extra_feats['signed_amount'][-10:]).ewm(span=5).mean()
+        # Price-Amount Elasticity (价格-成交额弹性)
+        # 衡量“推升价格的难度”。在趋势末端，往往成交额很大但价格动量减弱（背离）。
+        extra_feats['price_impact_efficiency'] = (
+            df['mid_diff1'] / (df['amount'] + 1e-5)
+        )
+        # Cumulative Signed Amount (累积方向性成交额)
+        extra_feats['cum_signed_amount_10'] = extra_feats['signed_amount'].rolling(window=10).sum()
+        extra_feats['cum_signed_amount_30'] = extra_feats['signed_amount'].rolling(window=30).sum()
+        # Amount-Weighted Momentum (成交额加权动量)
+        # 相比纯价格动量，该指标能过滤掉“无量波动”产生的噪音
+        for w in [10, 30]:
+            # 逻辑：过去 W 个 tick 内，价格上涨时的成交额之和 vs 下跌时的成交额之和
+            pos_flow = (df['amount'] * (df['mid_diff1'] > 0)).rolling(w).sum()
+            neg_flow = (df['amount'] * (df['mid_diff1'] < 0)).rolling(w).sum()
+            extra_feats[f'net_amount_ratio_{w}'] = (pos_flow - neg_flow) / (pos_flow + neg_flow + 1e-10)
+        for w in [20, 60]:
+            # 1. 价格与成交量的滚动相关性 (Trend Confirmation)
+            # 相关性趋近 -1 表示极度背离，趋近 1 表示量价同步。
+            # 这是树模型最喜欢的“交互特征”，能直接区分趋势的真伪。
+            extra_feats[f'pv_corr_{w}'] = (
+                df['mid_diff1'].rolling(w).corr(df['amount']).mean()
+            )
+            # 2. 价格动量与量能分配的差值 (Z-Score Spread)
+            # 将价格变动幅度与对数成交额分别做 Z-Score，看谁跑得更快。
+            # 逻辑：如果 price_z 远大于 amount_z，说明是“无量空涨”。
+            price_z = (df['mid_diff1'] - df['mid_diff1'].rolling(w).mean()) / (df['mid_diff1'].rolling(w).std() + 1e-10)
+            amount_z = (df['amount'] - df['amount'].rolling(w).mean()) / (df['amount'].rolling(w).std() + 1e-10)
+            extra_feats[f'pv_z_spread_{w}'] = price_z - amount_z
+
         df = pd.concat([df, pd.DataFrame(extra_feats, index=df.index)], axis=1)
 
         # 时间衰减采样历史数据
