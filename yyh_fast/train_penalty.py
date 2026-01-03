@@ -1,5 +1,5 @@
-from .model import XGBModel
-from .Predictor import preprocess_local, preprocess_platform
+from .model_penalty import XGBModel
+from .Predictor_penalty import preprocess_local, preprocess_platform
 from .data_process import *
 import os
 import numpy as np
@@ -57,14 +57,11 @@ def extract_feature(files_dir, N):
     def process_file(file, N):
         if os.path.exists(file):
             # df = pd.read_csv(file)[:-N]    # 数据处理：去除后N个数据，label没有意义
-            df = pd.read_csv(file)    # 加入penalty，不要[:-N]
+            df = pd.read_csv(file)
             if df.empty:
                 raise ValueError(f"File {file} is empty.")
             df = df.reset_index(drop=True)
             df, labels, profits = preprocess_local(df, is_train=True)
-            df = df[:-N]
-            labels = labels[:-N]
-            profits = profits[:-N]
             print("df.shape: ", df.shape)  # df.shape:  (1880, 420)
         else:
             print("file: ", file)
@@ -237,7 +234,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
     parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
-    parser.add_argument("--early_stopping_rounds", type=int, default=150, help="Number of early stopping rounds")
     parser.add_argument("--weight1", type=float, default=1.5, help="Weight 1 for custom loss")
     parser.add_argument("--weight2", type=float, default=0.5, help="Weight 2 for custom loss")
     parser.add_argument("--weight3", type=float, default=1.5, help="Weight 3 for custom loss")
@@ -249,18 +245,15 @@ if __name__ == "__main__":
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
     parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
-    # parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_QYH/", help="save_path")
+    parser.add_argument("--save_path", type=str, default="./models_ZZZ_Penalty/", help="save_path")
 
     parser.add_argument("--sym", type=str, default="all", help="sym identifier")
-    parser.add_argument("--penalty_scale", type=float, default=100.0, help="penalty_scale for custom loss")
-
+    parser.add_argument("--penalty_scale", type=float, default=10.0, help="penalty_scale for custom loss")
     args = parser.parse_args()
 
     # 打印参数
     print("===== Training Parameters =====")
     print(f"num_boost_round: {args.num_boost_round}")
-    print(f"early_stopping_rounds: {args.early_stopping_rounds}")
     print(f"weight1: {args.weight1}")
     print(f"weight2: {args.weight2}")
     print(f"weight3: {args.weight3}")
@@ -296,7 +289,7 @@ if __name__ == "__main__":
             val_data,
             val_labels,
             num_boost_round=args.num_boost_round,
-            early_stopping_rounds=args.early_stopping_rounds,
+            early_stopping_rounds=150,
             N=N,
             weight1=args.weight1,
             weight2=args.weight2,
@@ -316,11 +309,11 @@ if __name__ == "__main__":
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_ZZZ/model_20_all_20251229_102049.json")
-        # model = XGBModel()
+        # model = XGBModel("models_ZZZ_Penalty/model_20_all_20260102_210527.json")
         data_dir = "data/data_sym_test"
-        # data_dir = "data/data_sym0_test"
         # data_dir = "data/data_000"
+        # data_dir = "data/data_sym0_test"
+        # data_dir = "data/data_sym0_test_select"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
@@ -330,7 +323,7 @@ if __name__ == "__main__":
         print("test_files2: ", test_files2)
 
         test(test_files2, N=N, model=model)   # 本地最快评测
-        # test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
+        test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
         # test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")
