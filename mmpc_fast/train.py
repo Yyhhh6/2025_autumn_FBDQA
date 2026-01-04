@@ -170,9 +170,10 @@ def test(test_files, N, model, is_local=True, is_slice=False):
     y_pred = model.predict(test_data)   # (N, 3)
     print("y_pred shape: ", y_pred.shape)
 
-    target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    # target_confidences = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     # target_confidences = [0.5, 0.55, 0.6]
     # target_confidences = [0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9]
+    target_confidences = [0.8, 0.805, 0.81, 0.815, 0.82, 0.825, 0.83]
 
     for target_confidence in target_confidences:
         print(f"************target_confidence={target_confidence}************")
@@ -276,47 +277,47 @@ if __name__ == "__main__":
     print("===============================")
 
     for N in N_list:
-        # 划分训练集、验证集、测试集
-        train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
+        # # 划分训练集、验证集、测试集
+        # train_files, val_files, test_files = split_csv_files(data_dir=args.file_dir, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=1-TRAIN_RATIO-VAL_RATIO, seed=SEED)
 
-        print("train_files: ", train_files)
-        print("val_files: ", val_files)
-        print("test_files: ", test_files)
+        # print("train_files: ", train_files)
+        # print("val_files: ", val_files)
+        # print("test_files: ", test_files)
 
-        # 提取训练集、验证集、测试集的特征
-        train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
-        val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
+        # # 提取训练集、验证集、测试集的特征
+        # train_data, train_labels, train_profits = extract_feature(files_dir=train_files, N=N)
+        # val_data, val_labels, _ = extract_feature(files_dir=val_files, N=N)
 
-        print("train_data.shape: ", train_data.shape)
+        # print("train_data.shape: ", train_data.shape)
         
-        model = XGBModel()
-        model.train(
-            train_data,
-            train_labels,
-            val_data,
-            val_labels,
-            num_boost_round=args.num_boost_round,
-            early_stopping_rounds=args.early_stopping_rounds,
-            N=N,
-            weight1=args.weight1,
-            weight2=args.weight2,
-            weight3=args.weight3,
-            max_depth=args.max_depth,
-            subsample=args.subsample,
-            colsample_bytree=args.colsample_bytree,
-            min_child_weight=args.min_child_weight,
-            gamma=args.gamma,
-            save_path=args.save_path,
-            sym=args.sym,
-            penalty_scale=args.penalty_scale,
-            train_profits=train_profits
-        )
+        # model = XGBModel()
+        # model.train(
+        #     train_data,
+        #     train_labels,
+        #     val_data,
+        #     val_labels,
+        #     num_boost_round=args.num_boost_round,
+        #     early_stopping_rounds=args.early_stopping_rounds,
+        #     N=N,
+        #     weight1=args.weight1,
+        #     weight2=args.weight2,
+        #     weight3=args.weight3,
+        #     max_depth=args.max_depth,
+        #     subsample=args.subsample,
+        #     colsample_bytree=args.colsample_bytree,
+        #     min_child_weight=args.min_child_weight,
+        #     gamma=args.gamma,
+        #     save_path=args.save_path,
+        #     sym=args.sym,
+        #     penalty_scale=args.penalty_scale,
+        #     train_profits=train_profits
+        # )
 
         print("*"*50)
         print("Finish Traing, Starting Testing...")
         print("*"*50)
 
-        # model = XGBModel("models_QYH/model_20_all_20260103_182814.json")
+        model = XGBModel("qyh_fast/model_20_all_20260104_113819.json")
         data_dir = "data/data_sym_test"
         # data_dir = "data/data_sym1_test"
         # data_dir = "data/data_sym0_test_select0"
@@ -330,7 +331,7 @@ if __name__ == "__main__":
         print("test_files2: ", test_files2)
 
         test(test_files2, N=N, model=model)   # 本地最快评测
-        test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
+        # test(test_files2, N=N, model=model, is_slice=True, is_local=False)  # 切片评测 较快
         # test(test_files2, N=N, model=model, is_slice=True, is_local=True)   # 切片评测 较慢
     
     print("\n\n\n")

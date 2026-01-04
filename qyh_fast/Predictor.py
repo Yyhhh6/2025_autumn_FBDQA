@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260102_235444.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260104_113819.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -217,6 +217,19 @@ def preprocess_slice(x: list[pd.DataFrame]):
         df['price_up_amount_down'] = ((df['mid_diff1'] > 0) & (df['amount'] < df['amount'].shift(1))).astype(int)
         df['amount_price_div'] = df['mid_diff1'] / (df['amount'] + 1e-10)
 
+        df['bid_vol_sum'] = df[['n_bsize1','n_bsize2','n_bsize3','n_bsize4','n_bsize5']].sum(axis=1)
+        df['ask_vol_sum'] = df[['n_asize1','n_asize2','n_asize3','n_asize4','n_asize5']].sum(axis=1)
+        df['obi'] = (df['bid_vol_sum'] - df['ask_vol_sum']) / (df['bid_vol_sum'] + df['ask_vol_sum'] + 1e-6)
+        
+        df['bid_pressure'] = sum(df[f'n_bsize{i}']/i for i in range(1,6))
+        df['ask_pressure'] = sum(df[f'n_asize{i}']/i for i in range(1,6))
+        df['pressure_imb'] = (df['bid_pressure'] - df['ask_pressure']) / (df['bid_pressure'] + df['ask_pressure'] + 1e-6)
+
+        df['spread'] = df['n_ask1'] - df['n_bid1']
+
+        df['bid_wall_ratio'] = df['n_bsize1'] / df['bid_vol_sum']
+        df['ask_wall_ratio'] = df['n_asize1'] / df['ask_vol_sum']
+
         # 用字典存每个lag的特征
         lag_feats = {}
         feat_dict = {}
@@ -253,7 +266,6 @@ def preprocess_slice(x: list[pd.DataFrame]):
             for i in range(1, 6):
                 feat_dict[f'bsize{i}_lag{lag}'] = np.log1p(row[f'n_bsize{i}'])
                 feat_dict[f'asize{i}_lag{lag}'] = np.log1p(row[f'n_asize{i}'])
-            feat_dict[f'amount_lag{lag}'] = row['amount']
 
             # 把加权和价差变化加入 lag 特征
             for i in range(1, 4):
@@ -288,24 +300,43 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'price_control_lag{lag}'] = row['price_control']
             feat_dict[f'close_pos_lag{lag}'] = row['close_pos']
 
-            lag_feats.update(feat_dict)
+            # lag_feats.update(feat_dict)
 
         # for lag in lags2:
         #     # 用iloc直接取lag对应行
         #     row = df.iloc[-lag]
 
-            # 一阶 / 二阶差分（注意边界）
+            # 一阶 
             feat_dict[f'mid_diff1_lag{lag}'] = row["mid_diff1"]
 
-            # ===== 量价关系（仅采样点） =====
-            # 价格冲击
-            feat_dict[f'trade_impact_lag{lag}'] = row['amount'] * row['mid_diff1']
-            feat_dict[f'signed_amount_lag{lag}'] = np.sign(row['mid_diff1']) * row['amount']
-            # 量价背离
-            feat_dict[f'price_up_amount_down_lag{lag}'] = (
-                int(row['mid_diff1'] > 0) * int(row['amount'] < df['amount'].iloc[-lag-1])
-            )
-            feat_dict[f'amount_price_div_lag{lag}'] = row['mid_diff1'] / (row['amount'] + 1e-10)
+            # # ===== 量价关系（仅采样点） =====
+            # # 价格冲击
+            # feat_dict[f'trade_impact_lag{lag}'] = row['amount'] * row['mid_diff1']
+            # feat_dict[f'signed_amount_lag{lag}'] = np.sign(row['mid_diff1']) * row['amount']
+            # # 量价背离
+            # feat_dict[f'price_up_amount_down_lag{lag}'] = (
+            #     int(row['mid_diff1'] > 0) * int(row['amount'] < df['amount'].iloc[-lag-1])
+            # )
+            # feat_dict[f'amount_price_div_lag{lag}'] = row['mid_diff1'] / (row['amount'] + 1e-10)
+
+            feat_dict[f'amount_lag{lag}'] = row['amount']
+            feat_dict[f'signed_amount_lag{lag}'] = row['signed_amount']
+            feat_dict[f'trade_impact_lag{lag}'] = row['trade_impact']
+            feat_dict[f'price_up_amount_down_lag{lag}'] = row['price_up_amount_down']
+            feat_dict[f'amount_price_div_lag{lag}'] = row['amount_price_div']
+
+            feat_dict[f'bid_vol_sum_lag{lag}'] = row['bid_vol_sum']
+            feat_dict[f'ask_vol_sum_lag{lag}'] = row['ask_vol_sum']
+            feat_dict[f'obi_lag{lag}'] = row['obi']
+
+            feat_dict[f'bid_pressure_lag{lag}'] = row['bid_pressure']
+            feat_dict[f'ask_pressure_lag{lag}'] = row['ask_pressure']
+            feat_dict[f'pressure_imb_lag{lag}'] = row['pressure_imb']
+
+            feat_dict[f'spread_lag{lag}'] = row['spread']
+
+            feat_dict[f'bid_wall_ratio_lag{lag}'] = row['bid_wall_ratio']
+            feat_dict[f'ask_wall_ratio_lag{lag}'] = row['ask_wall_ratio']
 
             lag_feats.update(feat_dict)
 
@@ -622,6 +653,43 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 feat_dict[f'amount_z_{w}_lag{lag}'] = (row['amount'] - feat_dict[f'amount_ma{w}_lag{lag}']) / (feat_dict[f'amount_std{w}_lag{lag}']+1e-10)
                 feat_dict[f'pv_z_spread_{w}_lag{lag}'] = feat_dict[f'price_z_{w}_lag{lag}'] - feat_dict[f'amount_z_{w}_lag{lag}']
 
+            for w in [5, 20, 50, 100]:
+                obi_window = df['obi'].iloc[-lag+1-w:None if lag == 1 else -lag+1]
+
+                feat_dict[f'obi_mean_{w}_lag{lag}'] = obi_window.mean()
+                feat_dict[f'obi_std_{w}_lag{lag}'] = obi_window.std()
+                k, r2 = rolling_lr_k_r2(obi_window)
+                feat_dict[f'obi_slope_k_{w}_lag{lag}'] = k
+                feat_dict[f'obi_slope_r2_{w}_lag{lag}'] = r2
+                feat_dict[f'obi_slope_trend_strength_{w}_lag{lag}'] = np.sign(k) * r2
+                feat_dict[f'obi_slope_price_move_capacity_{w}_lag{lag}'] = k / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
+                feat_dict[f'obi_slope_trend_liquidity_ratio_{w}_lag{lag}'] = np.sign(k) * r2 / (feat_dict[f'relative_spread1_lag{lag}'] + 1e-10)
+                feat_dict[f'obi_slope_trend_regime_{w}_lag{lag}'] = (
+                    (r2 > r2_threshold) &
+                    (np.abs(k) > k_threshold)
+                ).astype(int)
+                feat_dict[f'obi_slope_trend_strength_gated_{w}_lag{lag}'] = feat_dict[f'obi_slope_trend_strength_{w}_lag{lag}'] * feat_dict[f'obi_slope_trend_regime_{w}_lag{lag}']
+                
+                feat_dict[f'pressure_imb_mean_{w}_lag{lag}'] = df['pressure_imb'].iloc[-lag+1-w:None if lag == 1 else -lag+1].mean()
+                feat_dict[f'pressure_imb_std_{w}_lag{lag}'] = df['pressure_imb'].iloc[-lag+1-w:None if lag == 1 else -lag+1].std()
+
+                feat_dict[f'spread_mean_{w}_lag{lag}'] = df['spread'].iloc[-lag+1-w:None if lag == 1 else -lag+1].mean()
+                feat_dict[f'spread_std_{w}_lag{lag}'] = df['spread'].iloc[-lag+1-w:None if lag == 1 else -lag+1].std()
+
+                feat_dict[f'bid_wall_mean_{w}_lag{lag}'] = df['bid_wall_ratio'].iloc[-lag+1-w:None if lag == 1 else -lag+1].mean()
+                feat_dict[f'ask_wall_mean_{w}_lag{lag}'] = df['ask_wall_ratio'].iloc[-lag+1-w:None if lag == 1 else -lag+1].mean()
+
+                feat_dict[f'bid_ask_wall_ratio_{w}_lag{lag}'] = feat_dict[f'bid_wall_mean_{w}_lag{lag}'] / (feat_dict[f'ask_wall_mean_{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'obi_spread_ratio_{w}_lag{lag}'] = feat_dict[f'obi_mean_{w}_lag{lag}'] / (feat_dict[f'spread_mean_{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'pressure_wall_ratio_{w}_lag{lag}'] = feat_dict[f'pressure_imb_mean_{w}_lag{lag}'] * feat_dict[f'bid_wall_mean_{w}_lag{lag}']
+
+                feat_dict[f'spread_std_over_obi_{w}_lag{lag}'] = feat_dict[f'spread_std_{w}_lag{lag}'] / (feat_dict[f'obi_std_{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'pressure_obi_std_ratio_{w}_lag{lag}'] = feat_dict[f'pressure_imb_std_{w}_lag{lag}'] / (feat_dict[f'obi_std_{w}_lag{lag}'] + 1e-10)
+                feat_dict[f'spread_obi_prod_{w}_lag{lag}'] = feat_dict[f'spread_mean_{w}_lag{lag}'] * feat_dict[f'obi_mean_{w}_lag{lag}']
+
+                feat_dict[f'obi_spread_wall_{w}_lag{lag}'] = feat_dict[f'obi_mean_{w}_lag{lag}'] * feat_dict[f'spread_mean_{w}_lag{lag}'] * (feat_dict[f'bid_wall_mean_{w}_lag{lag}'] + feat_dict[f'ask_wall_mean_{w}_lag{lag}'])
+                feat_dict[f'pressure_ratio_wall_ratio_spread_{w}_lag{lag}'] = (feat_dict[f'pressure_imb_mean_{w}_lag{lag}'] / (feat_dict[f'bid_wall_mean_{w}_lag{lag}']+1e-10)) * feat_dict[f'spread_mean_{w}_lag{lag}']
+
             lag_feats.update(feat_dict)
 
         x_extract.append(lag_feats)
@@ -729,6 +797,15 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'mid_diff1', 
         'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
         'trade_sign', 'aggression_eff', 'price_control', 'close_pos',
+        'bid_vol_sum',
+        'ask_vol_sum',
+        'obi',
+        'bid_pressure',
+        'ask_pressure',
+        'pressure_imb',
+        'spread',
+        'bid_wall_ratio',
+        'ask_wall_ratio',
     ]
 
     # 高阶特征
@@ -840,6 +917,29 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'price_z_5', 'price_z_20', 'price_z_50', 'price_z_100', 
         'amount_z_5', 'amount_z_20', 'amount_z_50', 'amount_z_100', 
         'pv_z_spread_5', 'pv_z_spread_20', 'pv_z_spread_50', 'pv_z_spread_100', 
+        'obi_mean_5', 'obi_mean_20', 'obi_mean_50', 'obi_mean_100', 
+        'obi_std_5', 'obi_std_20', 'obi_std_50', 'obi_std_100', 
+        'obi_slope_k_5', 'obi_slope_k_20', 'obi_slope_k_50', 'obi_slope_k_100', 
+        'obi_slope_r2_5', 'obi_slope_r2_20', 'obi_slope_r2_50', 'obi_slope_r2_100', 
+        'obi_slope_trend_strength_5', 'obi_slope_trend_strength_20', 'obi_slope_trend_strength_50', 'obi_slope_trend_strength_100', 
+        'obi_slope_price_move_capacity_5', 'obi_slope_price_move_capacity_20', 'obi_slope_price_move_capacity_50', 'obi_slope_price_move_capacity_100', 
+        'obi_slope_trend_liquidity_ratio_5', 'obi_slope_trend_liquidity_ratio_20', 'obi_slope_trend_liquidity_ratio_50', 'obi_slope_trend_liquidity_ratio_100', 
+        'obi_slope_trend_regime_5', 'obi_slope_trend_regime_20', 'obi_slope_trend_regime_50', 'obi_slope_trend_regime_100', 
+        'obi_slope_trend_strength_gated_5', 'obi_slope_trend_strength_gated_20', 'obi_slope_trend_strength_gated_50', 'obi_slope_trend_strength_gated_100', 
+        'pressure_imb_mean_5', 'pressure_imb_mean_20', 'pressure_imb_mean_50', 'pressure_imb_mean_100', 
+        'pressure_imb_std_5', 'pressure_imb_std_20', 'pressure_imb_std_50', 'pressure_imb_std_100', 
+        'spread_mean_5', 'spread_mean_20', 'spread_mean_50', 'spread_mean_100', 
+        'spread_std_5', 'spread_std_20', 'spread_std_50', 'spread_std_100', 
+        'bid_wall_mean_5', 'bid_wall_mean_20', 'bid_wall_mean_50', 'bid_wall_mean_100', 
+        'ask_wall_mean_5', 'ask_wall_mean_20', 'ask_wall_mean_50', 'ask_wall_mean_100', 
+        'bid_ask_wall_ratio_5', 'bid_ask_wall_ratio_20', 'bid_ask_wall_ratio_50', 'bid_ask_wall_ratio_100', 
+        'obi_spread_ratio_5', 'obi_spread_ratio_20', 'obi_spread_ratio_50', 'obi_spread_ratio_100', 
+        'pressure_wall_ratio_5', 'pressure_wall_ratio_20', 'pressure_wall_ratio_50', 'pressure_wall_ratio_100', 
+        'spread_std_over_obi_5', 'spread_std_over_obi_20', 'spread_std_over_obi_50', 'spread_std_over_obi_100', 
+        'pressure_obi_std_ratio_5', 'pressure_obi_std_ratio_20', 'pressure_obi_std_ratio_50', 'pressure_obi_std_ratio_100', 
+        'spread_obi_prod_5', 'spread_obi_prod_20', 'spread_obi_prod_50', 'spread_obi_prod_100', 
+        'obi_spread_wall_5', 'obi_spread_wall_20', 'obi_spread_wall_50', 'obi_spread_wall_100', 
+        'pressure_ratio_wall_ratio_spread_5', 'pressure_ratio_wall_ratio_spread_20', 'pressure_ratio_wall_ratio_spread_50', 'pressure_ratio_wall_ratio_spread_100', 
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -1330,40 +1430,54 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             extra_feats[f'amount_z_{w}'] = (df['amount'] - df[f'amount_ma{w}']) / (df[f'amount_std{w}']+1e-10)
             extra_feats[f'pv_z_spread_{w}'] = extra_feats[f'price_z_{w}'] - extra_feats[f'amount_z_{w}']
 
-        # # mid_price 和 amount 的联合特征
-        # # Signed Log Money Flow (方向性对数资金流)
-        # extra_feats['signed_amount'] = np.sign(df['mid_diff1']) * df['amount']
-        # # 对其做短周期平滑，捕捉“持续性流向”
-        # # extra_feats['signed_amount_ema5'] = pd.Series(extra_feats['signed_amount'][-10:]).ewm(span=5).mean()
-        # # Price-Amount Elasticity (价格-成交额弹性)
-        # # 衡量“推升价格的难度”。在趋势末端，往往成交额很大但价格动量减弱（背离）。
-        # extra_feats['price_impact_efficiency'] = (
-        #     df['mid_diff1'] / (df['amount'] + 1e-5)
-        # )
-        # # Cumulative Signed Amount (累积方向性成交额)
-        # extra_feats['cum_signed_amount_10'] = extra_feats['signed_amount'].rolling(window=10).sum()
-        # extra_feats['cum_signed_amount_30'] = extra_feats['signed_amount'].rolling(window=30).sum()
-        # # Amount-Weighted Momentum (成交额加权动量)
-        # # 相比纯价格动量，该指标能过滤掉“无量波动”产生的噪音
-        # for w in [10, 30]:
-        #     # 逻辑：过去 W 个 tick 内，价格上涨时的成交额之和 vs 下跌时的成交额之和
-        #     pos_flow = (df['amount'] * (df['mid_diff1'] > 0)).rolling(w).sum()
-        #     neg_flow = (df['amount'] * (df['mid_diff1'] < 0)).rolling(w).sum()
-        #     extra_feats[f'net_amount_ratio_{w}'] = (pos_flow - neg_flow) / (pos_flow + neg_flow + 1e-10)
-        # for w in [20, 60]:
-        #     # 1. 价格与成交量的滚动相关性 (Trend Confirmation)
-        #     # 相关性趋近 -1 表示极度背离，趋近 1 表示量价同步。
-        #     # 这是树模型最喜欢的“交互特征”，能直接区分趋势的真伪。
-        #     # extra_feats[f'pv_corr_{w}'] = (
-        #     #     df['mid_diff1'].rolling(w).corr(df['amount']).mean()
-        #     # )
-        #     # 2. 价格动量与量能分配的差值 (Z-Score Spread)
-        #     # 将价格变动幅度与对数成交额分别做 Z-Score，看谁跑得更快。
-        #     # 逻辑：如果 price_z 远大于 amount_z，说明是“无量空涨”。
-        #     price_z = (df['mid_diff1'] - df['mid_diff1'].rolling(w).mean()) / (df['mid_diff1'].rolling(w).std() + 1e-10)
-        #     amount_z = (df['amount'] - df['amount'].rolling(w).mean()) / (df['amount'].rolling(w).std() + 1e-10)
-        #     extra_feats[f'pv_z_spread_{w}'] = price_z - amount_z
+        extra_feats['bid_vol_sum'] = df[['n_bsize1','n_bsize2','n_bsize3','n_bsize4','n_bsize5']].sum(axis=1)
+        extra_feats['ask_vol_sum'] = df[['n_asize1','n_asize2','n_asize3','n_asize4','n_asize5']].sum(axis=1)
+        extra_feats['obi'] = (extra_feats['bid_vol_sum'] - extra_feats['ask_vol_sum']) / (extra_feats['bid_vol_sum'] + extra_feats['ask_vol_sum'] + 1e-6)
         
+        extra_feats['bid_pressure'] = sum(df[f'n_bsize{i}']/i for i in range(1,6))
+        extra_feats['ask_pressure'] = sum(df[f'n_asize{i}']/i for i in range(1,6))
+        extra_feats['pressure_imb'] = (extra_feats['bid_pressure'] - extra_feats['ask_pressure']) / (extra_feats['bid_pressure'] + extra_feats['ask_pressure'] + 1e-6)
+
+        extra_feats['spread'] = df['n_ask1'] - df['n_bid1']
+
+        extra_feats['bid_wall_ratio'] = df['n_bsize1'] / extra_feats['bid_vol_sum']
+        extra_feats['ask_wall_ratio'] = df['n_asize1'] / extra_feats['ask_vol_sum']
+
+        for w in [5, 20, 50, 100]:
+            extra_feats[f'obi_mean_{w}'] = extra_feats['obi'].rolling(w, min_periods=1).mean()
+            extra_feats[f'obi_std_{w}'] = extra_feats['obi'].rolling(w, min_periods=1).std()
+            k, r2 = rolling_lr_features(extra_feats['obi'].to_numpy(), window=w)
+            extra_feats[f'obi_slope_k_{w}'] = k
+            extra_feats[f'obi_slope_r2_{w}'] = r2
+            extra_feats[f'obi_slope_trend_strength_{w}'] = np.sign(k) * r2
+            extra_feats[f'obi_slope_price_move_capacity_{w}'] = k / (df[f'relative_spread1'] + 1e-10)
+            extra_feats[f'obi_slope_trend_liquidity_ratio_{w}'] = np.sign(k) * r2 / (df[f'relative_spread1'] + 1e-10)
+            extra_feats[f'obi_slope_trend_regime_{w}'] = (
+                (r2 > r2_threshold) &
+                (np.abs(k) > k_threshold)
+            ).astype(int)
+            extra_feats[f'obi_slope_trend_strength_gated_{w}'] = extra_feats[f'obi_slope_trend_strength_{w}'] * extra_feats[f'obi_slope_trend_regime_{w}']
+            
+            extra_feats[f'pressure_imb_mean_{w}'] = extra_feats['pressure_imb'].rolling(w, min_periods=1).mean()
+            extra_feats[f'pressure_imb_std_{w}'] = extra_feats['pressure_imb'].rolling(w, min_periods=1).std()
+
+            extra_feats[f'spread_mean_{w}'] = extra_feats['spread'].rolling(w, min_periods=1).mean()
+            extra_feats[f'spread_std_{w}'] = extra_feats['spread'].rolling(w, min_periods=1).std()
+
+            extra_feats[f'bid_wall_mean_{w}'] = extra_feats['bid_wall_ratio'].rolling(w, min_periods=1).mean()
+            extra_feats[f'ask_wall_mean_{w}'] = extra_feats['ask_wall_ratio'].rolling(w, min_periods=1).mean()
+
+            extra_feats[f'bid_ask_wall_ratio_{w}'] = extra_feats[f'bid_wall_mean_{w}'] / (extra_feats[f'ask_wall_mean_{w}'] + 1e-10)
+            extra_feats[f'obi_spread_ratio_{w}'] = extra_feats[f'obi_mean_{w}'] / (extra_feats[f'spread_mean_{w}'] + 1e-10)
+            extra_feats[f'pressure_wall_ratio_{w}'] = extra_feats[f'pressure_imb_mean_{w}'] * extra_feats[f'bid_wall_mean_{w}']
+
+            extra_feats[f'spread_std_over_obi_{w}'] = extra_feats[f'spread_std_{w}'] / (extra_feats[f'obi_std_{w}'] + 1e-10)
+            extra_feats[f'pressure_obi_std_ratio_{w}'] = extra_feats[f'pressure_imb_std_{w}'] / (extra_feats[f'obi_std_{w}'] + 1e-10)
+            extra_feats[f'spread_obi_prod_{w}'] = extra_feats[f'spread_mean_{w}'] * extra_feats[f'obi_mean_{w}']
+
+            extra_feats[f'obi_spread_wall_{w}'] = extra_feats[f'obi_mean_{w}'] * extra_feats[f'spread_mean_{w}'] * (extra_feats[f'bid_wall_mean_{w}'] + extra_feats[f'ask_wall_mean_{w}'])
+            extra_feats[f'pressure_ratio_wall_ratio_spread_{w}'] = (extra_feats[f'pressure_imb_mean_{w}'] / (extra_feats[f'bid_wall_mean_{w}']+1e-10)) * extra_feats[f'spread_mean_{w}']
+
         df = pd.concat([df, pd.DataFrame(extra_feats, index=df.index)], axis=1)
 
         # 时间衰减采样历史数据
