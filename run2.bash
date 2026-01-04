@@ -1,5 +1,9 @@
-python -m mmpc_fast.train --early_stopping_rounds 150 | tee -a output_QYH.log
-
-python -m mmpc_fast.train --early_stopping_rounds 100 | tee -a output_QYH.log
-
-python -m mmpc_fast.train --early_stopping_rounds 200 | tee -a output_QYH.log
+'bid_vol_sum',
+'ask_vol_sum',
+'obi',
+'bid_pressure',
+'ask_pressure',
+'pressure_imb',
+'spread',
+'bid_wall_ratio',
+'ask_wall_ratio',

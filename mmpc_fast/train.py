@@ -236,7 +236,7 @@ def test(test_files, N, model, is_local=True, is_slice=False):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train and test XGBModel")
-    parser.add_argument("--num_boost_round", type=int, default=8000, help="Number of boosting rounds")
+    parser.add_argument("--num_boost_round", type=int, default=15000, help="Number of boosting rounds")
     parser.add_argument("--early_stopping_rounds", type=int, default=150, help="Number of early stopping rounds")
     parser.add_argument("--weight1", type=float, default=1.5, help="Weight 1 for custom loss")
     parser.add_argument("--weight2", type=float, default=0.5, help="Weight 2 for custom loss")
@@ -248,9 +248,9 @@ if __name__ == "__main__":
     parser.add_argument("--min_child_weight", type=int, default=12, help="Minimum sum of instance weight in a child")
     parser.add_argument("--gamma", type=float, default=4.3, help="Minimum loss reduction to make a split")
     
-    # parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
-    parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
-    parser.add_argument("--save_path", type=str, default="./models_QYH_all/", help="save_path")
+    parser.add_argument("--file_dir", type=str, default="./data/data_sym_train", help="file_dir")
+    # parser.add_argument("--file_dir", type=str, default="./data/data_sym0_test", help="file_dir")
+    parser.add_argument("--save_path", type=str, default="./models_QYH_ZHONG/", help="save_path")
 
     parser.add_argument("--sym", type=str, default="all", help="sym identifier")
     parser.add_argument("--penalty_scale", type=float, default=100.0, help="penalty_scale for custom loss")
@@ -317,10 +317,10 @@ if __name__ == "__main__":
         print("*"*50)
 
         # model = XGBModel("models_QYH/model_20_all_20260103_182814.json")
-        # data_dir = "data/data_sym_test"
+        data_dir = "data/data_sym_test"
         # data_dir = "data/data_sym1_test"
         # data_dir = "data/data_sym0_test_select0"
-        data_dir = "data/data_sym0_test_select"
+        # data_dir = "data/data_sym0_test_select"
         test_files2 = [
             os.path.join(data_dir, f)
             for f in os.listdir(data_dir)
