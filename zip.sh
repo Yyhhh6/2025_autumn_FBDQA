@@ -1,1 +1,1 @@
-zip -r qyh_fast_QYH_1_3_22_17.zip qyh_fast/
+zip -r qyh_fast_QYH_1_4.zip qyh_fast/

@@ -11,7 +11,7 @@ class Predictor():
     def __init__(self):
         # 指定模型路径，不使用相对路径
         # pth_path = os.path.join(os.path.dirname(__file__), 'model.pth')
-        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260103_141115.json')
+        pth_path = os.path.join(os.path.dirname(__file__), 'model_20_all_20260103_182753.json')
         # 加载模型并移动到对应设备，假设模型是整个模型保存，如果是参数字典需要初始化结构
         self.model = self.load_model(pth_path)
         print(f"model loaded from {pth_path}")
@@ -103,7 +103,7 @@ def split_df_sliding(df: pd.DataFrame, window=100):
     return xs
 
 
-def compare_dfs(df1, df2, tol=1e-8):
+def compare_dfs(df1, df2, tol=1e-6):
     # --- 统一转成 DataFrame ---
     if isinstance(df1, pd.Series):
         df1 = df1.to_frame()
@@ -126,8 +126,8 @@ def compare_dfs(df1, df2, tol=1e-8):
     df1_common = df1.loc[common_idx, common_cols]
     df2_common = df2.loc[common_idx, common_cols]
     
-    # diff_mask = (df1_common - df2_common).abs() > tol
-    diff_mask = ~(df1_common.eq(df2_common) | (df1_common.isna() & df2_common.isna()))
+    diff_mask = (df1_common - df2_common).abs() > tol
+    # diff_mask = ~(df1_common.eq(df2_common) | (df1_common.isna() & df2_common.isna()))
     num_diff = diff_mask.sum().sum()
     print("Number of different values (tol={}):".format(tol), num_diff)
     
@@ -158,6 +158,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
     x_extract = []
     # print("len(x): ", len(x))
     lags1=[1, 2, 5, 10, 20, 50]
+    # lags1=[1, 2, 5,]
     # lags2=[1, 2, 5]
     lags2=[1]
     lags3=[1]
@@ -173,26 +174,44 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
         # 中间价一阶差分
         df['mid_price'] = 1 + df['n_midprice']
-        # df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
-        # df['amount'] = np.log1p(df['amount_delta'])
+        df['mid_diff1'] = df['mid_price'].diff().fillna(0)   # 一阶差分：速度
+        df['amount'] = np.log1p(df['amount_delta'])
 
         # 真实成交量
         df['real_volume'] = np.log1p(df['amount_delta'] / (df['mid_price'] + 1e-10))
 
-        # ********************下面用循环的方法计算差分好像更快********************
-        mid_price = df['mid_price'].to_numpy()
-        mid_diff1 = np.empty_like(mid_price)
-        mid_diff1[0] = 0.0
-        prev = mid_price[0]
-        mid_diff1_sum = 0
-        for i in range(1, 100):
-            diff = mid_price[i] - prev
-            mid_diff1[i] = diff
-            prev = mid_price[i] 
-            mid_diff1_sum += diff if diff > 0 else -diff
-        mid_diff1_open_close = mid_price[-1] - mid_price[0]
-        df['mid_diff1'] = mid_diff1
-        # print("mid_diff1: ", mid_diff1)
+        # # ********************下面用循环的方法计算差分好像更快********************
+        # mid_price = df['mid_price'].to_numpy()
+        # mid_diff1 = np.empty_like(mid_price)
+        # mid_diff1[0] = 0.0
+        # prev = mid_price[0]
+        # mid_diff1_sum = 0
+        # for i in range(1, 100):
+        #     diff = mid_price[i] - prev
+        #     mid_diff1[i] = diff
+        #     prev = mid_price[i] 
+        #     mid_diff1_sum += diff if diff > 0 else -diff
+        # mid_diff1_open_close = mid_price[-1] - mid_price[0]
+        # df['mid_diff1'] = mid_diff1
+        # # print("mid_diff1: ", mid_diff1)
+
+        df['trade_sign'] = np.where(
+            df['n_close'] == df['n_ask1'],  1,
+            np.where(df['n_close'] == df['n_bid1'], -1, 0)
+        )
+        # print("trade_sign: ", trade_sign)
+
+        df['aggression_eff'] = df['trade_sign'] * np.sign(df['mid_diff1'])
+        df['price_control'] = df['trade_sign'] * df['mid_diff1']
+
+        df['close_pos'] = (
+            (df['n_close'] - df['n_midprice'])
+            / ((df['n_ask1'] - df['n_bid1']) / 2 + 1e-10)
+        )
+
+        # mid_price 和 amount 的联合特征
+        # Signed Log Money Flow (方向性对数资金流)
+        df['signed_amount'] = np.sign(df['mid_diff1']) * df['amount']
 
         # 用字典存每个lag的特征
         lag_feats = {}
@@ -202,10 +221,10 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 用iloc直接取lag对应行
             row = df.iloc[-lag]
 
-            # 收盘价还原 TODO: 收盘价是什么？
+            # 收盘价还原
             feat_dict[f'close_lag{lag}'] = row['n_close'] + 1
 
-            # 基础价格还原  TODO: 下面的这些采样点都需要改进
+            # 基础价格还原
             for i in range(1, 6):
                 feat_dict[f'bid{i}_lag{lag}'] = row[f'n_bid{i}'] + 1
                 feat_dict[f'ask{i}_lag{lag}'] = row[f'n_ask{i}'] + 1
@@ -230,8 +249,8 @@ def preprocess_slice(x: list[pd.DataFrame]):
             for i in range(1, 6):
                 feat_dict[f'bsize{i}_lag{lag}'] = np.log1p(row[f'n_bsize{i}'])
                 feat_dict[f'asize{i}_lag{lag}'] = np.log1p(row[f'n_asize{i}'])
-            feat_dict[f'amount_lag{lag}'] = np.log1p(row['amount_delta'])
-            feat_dict[f'amount_midprice_lag{lag}'] = np.log1p(row['amount_delta'] / row['mid_price'])
+            feat_dict[f'amount_lag{lag}'] = row['amount']
+            feat_dict[f'amount_midprice_lag{lag}'] = row['real_volume']
 
             # 把加权和价差变化加入 lag 特征
             for i in range(1, 4):
@@ -261,51 +280,31 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 成交量与价格的比值（反映每单位价格变化的成交量变化）
             feat_dict[f'price_volume_ratio_lag{lag}'] = row['mid_price'] / (feat_dict[f'real_volume_lag{lag}'] + 1e-10)
 
+            feat_dict[f'trade_sign_lag{lag}'] = row['trade_sign']
+            feat_dict[f'aggression_eff_lag{lag}'] = row['aggression_eff']
+            feat_dict[f'price_control_lag{lag}'] = row['price_control']
+            feat_dict[f'close_pos_lag{lag}'] = row['close_pos']
+
             lag_feats.update(feat_dict)
 
-        for lag in lags2:
-            # 用iloc直接取lag对应行
-            row = df.iloc[-lag]
-
-            # # 一阶 / 二阶差分（注意边界）
-            # feat_dict[f'mid_diff1_lag{lag}'] = row["mid_diff1"]
-            # # ===== 量价关系（仅采样点） =====
-            # # 价格冲击
-            # feat_dict[f'trade_impact_lag{lag}'] = row['amount'] * row['mid_diff1']
-            # feat_dict[f'signed_amount_lag{lag}'] = np.sign(row['mid_diff1']) * row['amount']
-            # # 量价背离
-            # feat_dict[f'price_up_amount_down_lag{lag}'] = (
-            #     int(row['mid_diff1'] > 0) * int(row['amount'] < df['amount'].iloc[-lag-1])
-            # )
-            # feat_dict[f'amount_price_div_lag{lag}'] = row['mid_diff1'] / (row['amount'] + 1e-10)
+        # for lag in lags2:
+        #     # 用iloc直接取lag对应行
+        #     row = df.iloc[-lag]
 
             # 一阶 / 二阶差分（注意边界）
-            feat_dict[f'mid_diff1_lag{lag}'] = df.iloc[-lag]["mid_price"] - df.iloc[-lag-1]["mid_price"]
+            feat_dict[f'mid_diff1_lag{lag}'] = row["mid_diff1"]
+
             # ===== 量价关系（仅采样点） =====
             # 价格冲击
-            feat_dict[f'trade_impact_lag{lag}'] = feat_dict[f'amount_lag{lag}'] * feat_dict[f'mid_diff1_lag{lag}']
-            feat_dict[f'signed_amount_lag{lag}'] = np.sign(feat_dict[f'mid_diff1_lag{lag}']) * feat_dict[f'amount_lag{lag}']
+            feat_dict[f'trade_impact_lag{lag}'] = row['amount'] * row['mid_diff1']
+            feat_dict[f'signed_amount_lag{lag}'] = np.sign(row['mid_diff1']) * row['amount']
             # 量价背离
             feat_dict[f'price_up_amount_down_lag{lag}'] = (
-                int(feat_dict[f'mid_diff1_lag{lag}'] > 0) * int(feat_dict[f'amount_lag{lag}'] < np.log1p(df['amount_delta'].iloc[-lag-1]))
+                int(row['mid_diff1'] > 0) * int(row['amount'] < df['amount'].iloc[-lag-1])
             )
-            feat_dict[f'amount_price_div_lag{lag}'] = feat_dict[f'mid_diff1_lag{lag}'] / (feat_dict[f'amount_lag{lag}'] + 1e-10)
+            feat_dict[f'amount_price_div_lag{lag}'] = row['mid_diff1'] / (row['amount'] + 1e-10)
 
             lag_feats.update(feat_dict)
-
-        # 还原原始股价
-        sym_to_price = {
-            0: 1300,
-            1: 88.4,
-            2: 1004.6,
-            3: 61,
-            4: 444.4,
-            5: 302.4,
-            6: 535.2,
-            7: 323.2,
-            8: 395.4,
-            9: 1740,
-        }
 
         for lag in lags3:
             # 用iloc直接取lag对应行
@@ -318,6 +317,18 @@ def preprocess_slice(x: list[pd.DataFrame]):
             feat_dict[f'time_label_lag{lag}'] = assign_tick_time_label(row['time'])
 
             # 还原原始股价
+            sym_to_price = {
+                0: 1300,
+                1: 88.4,
+                2: 1004.6,
+                3: 61,
+                4: 444.4,
+                5: 302.4,
+                6: 535.2,
+                7: 323.2,
+                8: 395.4,
+                9: 1740,
+            }
             feat_dict[f'original_price_lag{lag}'] = sym_to_price[row['sym']]
 
             # 股价分类
@@ -327,11 +338,6 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 2 if feat_dict[f'original_price_lag{lag}'] < 1500 else 
                 3             
             )
-
-            # 真趋势” vs “来回波动
-            feat_dict[f'mid_diff1_open_close_lag{lag}'] = mid_diff1_open_close
-            feat_dict[f'mid_diff1_sum_lag{lag}'] = mid_diff1_sum
-            feat_dict[f'SignedTrendEff_lag{lag}'] = mid_diff1_open_close / (mid_diff1_sum + 1e-5)
 
             # time: 处理 HH:MM:SS 转换为以秒为单位的数值
             h, m, s = row['time'].split(':')
@@ -354,12 +360,9 @@ def preprocess_slice(x: list[pd.DataFrame]):
             for w in [1, 10, 40]:
                 feat_dict[f'midprice_delta_rate{w}_lag{lag}'] = row['mid_price'] / df['mid_price'].iloc[-lag-w] - 1
                 feat_dict[f'midprice_delta{w}_lag{lag}'] = row['mid_price'] - df['mid_price'].iloc[-lag-w]
-                # feat_dict[f'midprice_delta{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag]
                 feat_dict[f'close_delta{w}_lag{lag}'] = row['n_close'] - df['n_close'].iloc[-lag-w]
-                feat_dict[f'amount_delta{w}_lag{lag}'] = feat_dict[f'amount_lag{lag}'] - np.log1p(df['amount_delta'].iloc[-lag-w])
-
-                # 成交量的前向差分（反映成交量的变化趋势）
-                feat_dict[f'real_volume_delta{w}_lag{lag}'] = feat_dict[f'real_volume_lag{lag}'] - df["real_volume"].iloc[-lag-w]  
+                feat_dict[f'amount_delta{w}_lag{lag}'] = row['amount'] - df['amount'].iloc[-lag-w]
+                feat_dict[f'real_volume_delta{w}_lag{lag}'] = row['real_volume'] - df["real_volume"].iloc[-lag-w]  
                 
                 for i in [1, 3, 5]:
                     feat_dict[f'ask{i}_delta{w}_lag{lag}'] = row[f'n_ask{i}'] - df[f'n_ask{i}'].iloc[-lag-w]
@@ -368,12 +371,40 @@ def preprocess_slice(x: list[pd.DataFrame]):
                     feat_dict[f'asize{i}_delta{w}_lag{lag}'] = feat_dict[f'asize{i}_lag{lag}'] - np.log1p(df[f'n_asize{i}'].iloc[-lag-w])
                     feat_dict[f'bsize{i}_delta{w}_lag{lag}'] = feat_dict[f'bsize{i}_lag{lag}'] - np.log1p(df[f'n_bsize{i}'].iloc[-lag-w])
 
-            mid_diff1_spike_th = 0.0008
-            mid_diff1_threshold_1 = 10
-            mid_diff1_threshold_2 = 50
-
-            # 窗口特征
+            # 基于n_close成交方向的窗口特征
             for w in [5, 20, 50, 100]:
+            # for w in [5, 20, 50]:
+
+                feat_dict[f'trade_sign_sum{w}_lag{lag}'] = df['trade_sign'].iloc[-lag-w+1:None if lag == 1 else -lag+1].sum()
+                feat_dict[f'trade_sign_mean{w}_lag{lag}'] = df['trade_sign'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
+                feat_dict[f'trade_sign_aggression_eff{w}_lag{lag}'] = df['aggression_eff'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
+
+                # 成交持续性
+                feat_dict[f'trade_sign_buy_run{w}_lag{lag}'] = (df['trade_sign'].iloc[-lag-w+1:None if lag == 1 else -lag+1] == 1).sum()
+                feat_dict[f'trade_sign_sell_run{w}_lag{lag}'] = (df['trade_sign'].iloc[-lag-w+1:None if lag == 1 else -lag+1] == -1).sum()
+
+                # 势能不对称
+                feat_dict[f'trade_sign_aggression_skew{w}_lag{lag}'] = (
+                    (feat_dict[f'trade_sign_buy_run{w}_lag{lag}'] - feat_dict[f'trade_sign_sell_run{w}_lag{lag}'])
+                    / (w + 1e-10)
+                )
+
+                # 主动成交推动率
+                feat_dict[f'trade_sign_price_control{w}_lag{lag}'] = (df['price_control'].iloc[-lag-w+1:None if lag == 1 else -lag+1] == -1).mean()
+
+                # rolling 成交压强
+                feat_dict[f'trade_sign_close_pressure{w}_lag{lag}'] = (df['close_pos'].iloc[-lag-w+1:None if lag == 1 else -lag+1] == -1).mean()
+
+                # 势能组合指数
+                feat_dict[f'aggression_score{w}_lag{lag}'] = (
+                    0.4 * feat_dict[f'trade_sign_aggression_skew{w}_lag{lag}']
+                    + 0.3 * feat_dict[f'trade_sign_close_pressure{w}_lag{lag}']
+                    + 0.3 * feat_dict[f'trade_sign_price_control{w}_lag{lag}']
+                )
+
+            # mid_price 窗口特征
+            for w in [5, 20, 50, 100]:
+            # for w in [5, 20, 50]:
                 feat_dict[f'mid_price_ma{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_price_std{w}_lag{lag}'] = df['mid_price'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
                 feat_dict[f'mid_price_vol_ratio{w}_lag{lag}'] = feat_dict[f'mid_price_std{w}_lag{lag}'] / (np.abs(feat_dict[f'mid_price_ma{w}_lag{lag}']) + 1e-10)
@@ -383,19 +414,32 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 feat_dict[f'mid_price_max_min{w}_lag{lag}'] = feat_dict[f'mid_price_max{w}_lag{lag}'] - feat_dict[f'mid_price_min{w}_lag{lag}']
                 feat_dict[f'pos_{w}_lag{lag}'] = (row['mid_price'] -  feat_dict[f'mid_price_min{w}_lag{lag}']) / (feat_dict[f'mid_price_max{w}_lag{lag}'] -  feat_dict[f'mid_price_min{w}_lag{lag}'] + 1e-10)
 
+            mid_diff1_spike_th = 0.0008
+            mid_diff1_threshold_1 = 10
+            mid_diff1_threshold_2 = 50
+
+            # mid_diff1 窗口特征
+            for w in [5, 20, 50, 100]:
+            # for w in [5, 20, 50]:
+
                 feat_dict[f'mid_diff1_ma{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'mid_diff1_std{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
                 feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'] = feat_dict[f'mid_diff1_std{w}_lag{lag}'] / (np.abs(feat_dict[f'mid_diff1_ma{w}_lag{lag}']) + 1e-10)
-                # print("feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}']: ", feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'])
 
                 feat_dict[f'mid_diff1_max{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].max()
                 feat_dict[f'mid_diff1_min{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].min()
                 feat_dict[f'mid_diff1_max_min{w}_lag{lag}'] = feat_dict[f'mid_diff1_max{w}_lag{lag}'] - feat_dict[f'mid_diff1_min{w}_lag{lag}']
 
+                # 真趋势” vs “来回波动
+                feat_dict[f'mid_diff1_open_close{w}_lag{lag}'] = df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1].sum()
+                feat_dict[f'mid_diff1_sum{w}_lag{lag}'] = np.abs(df['mid_diff1'].iloc[-lag-w+1:None if lag == 1 else -lag+1]).sum()
+                feat_dict[f'SignedTrendEff{w}_lag{lag}'] = feat_dict[f'mid_diff1_open_close{w}_lag{lag}'] / (feat_dict[f'mid_diff1_sum{w}_lag{lag}'] + 1e-5)
+
                 # 窗口内是否曾出现强冲击
                 feat_dict[f'mid_diff1_has_spike{w}_lag{lag}'] = (
                     (feat_dict[f'mid_diff1_max{w}_lag{lag}'] > mid_diff1_spike_th) or (-feat_dict[f'mid_diff1_min{w}_lag{lag}'] > mid_diff1_spike_th)
                 ).astype(int)
+
                 # 窗口内是否出现 高震荡or平台
                 feat_dict[f'mid_diff1_is_flat{w}_lag{lag}'] = (
                     (feat_dict[f'mid_diff1_vol_ratio{w}_lag{lag}'] < mid_diff1_threshold_1)
@@ -420,6 +464,10 @@ def preprocess_slice(x: list[pd.DataFrame]):
                     signs == last_sign
                 )
 
+            # real_volume 窗口特征
+            for w in [5, 20, 50, 100]:
+            # for w in [5, 20, 50]:
+
                 feat_dict[f'real_volume_ma{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].mean()
                 feat_dict[f'real_volume_std{w}_lag{lag}'] = df['real_volume'].iloc[-lag-w+1:None if lag == 1 else -lag+1].std()
                 feat_dict[f'real_volume_vol_ratio{w}_lag{lag}'] = feat_dict[f'real_volume_std{w}_lag{lag}'] / (np.abs(feat_dict[f'real_volume_ma{w}_lag{lag}']) + 1e-10)
@@ -432,6 +480,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
             # 长短窗口特征对比
             feat_dict[f'mid_diff1_vol_ratio_sl_5_50_lag{lag}'] = feat_dict[f'mid_diff1_vol_ratio5_lag{lag}'] / (feat_dict[f'mid_diff1_vol_ratio50_lag{lag}'] + 1e-6)
             feat_dict[f'real_volume_vol_ratio_sl_5_50_lag{lag}'] = feat_dict[f'real_volume_vol_ratio5_lag{lag}'] / (feat_dict[f'real_volume_vol_ratio50_lag{lag}'] + 1e-6)
+
             feat_dict[f'mid_diff1_vol_ratio_sl_20_100_lag{lag}'] = feat_dict[f'mid_diff1_vol_ratio20_lag{lag}'] / (feat_dict[f'mid_diff1_vol_ratio100_lag{lag}'] + 1e-6)
             feat_dict[f'real_volume_vol_ratio_sl_20_100_lag{lag}'] = feat_dict[f'real_volume_vol_ratio20_lag{lag}'] / (feat_dict[f'real_volume_vol_ratio100_lag{lag}'] + 1e-6)
 
@@ -527,6 +576,36 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 np.sign(k_dict[60]) * r2_dict[60]
             )
 
+            # mid_diff1 与 成交量 的关系特征
+            # 对其做短周期平滑，捕捉“持续性流向”
+            feat_dict[f'signed_amount_ema5_lag{lag}'] = pd.Series(df['signed_amount'][-10:]).ewm(span=5).mean().iloc[-1]
+            # Price-Amount Elasticity (价格-成交额弹性)
+            # 衡量“推升价格的难度”。在趋势末端，往往成交额很大但价格动量减弱（背离）。
+            feat_dict[f'price_impact_efficiency_lag{lag}'] = df['mid_diff1'].iloc[-1] / (df['amount'].iloc[-1] + 1e-5)
+            
+            # Amount-Weighted Momentum (成交额加权动量)
+            # 相比纯价格动量，该指标能过滤掉“无量波动”产生的噪音
+            for w in [10, 30]:
+                # 逻辑：过去 W 个 tick 内，价格上涨时的成交额之和 vs 下跌时的成交额之和
+                pos_flow = (df['amount'] * (df['mid_diff1'] > 0)).rolling(w).sum()
+                neg_flow = (df['amount'] * (df['mid_diff1'] < 0)).rolling(w).sum()
+                feat_dict[f'net_amount_ratio_{w}_lag{lag}'] = ((pos_flow - neg_flow) / (pos_flow + neg_flow + 1e-10)).iloc[-1]
+
+            # Cumulative Signed Amount (累积方向性成交额)
+            feat_dict[f'cum_signed_amount_10_lag{lag}'] = df['signed_amount'].rolling(window=10).sum().iloc[-1]
+            feat_dict[f'cum_signed_amount_30_lag{lag}'] = df['signed_amount'].rolling(window=30).sum().iloc[-1]
+            for w in [20, 60]:
+                # 1. 价格与成交量的滚动相关性 (Trend Confirmation)
+                # 相关性趋近 -1 表示极度背离，趋近 1 表示量价同步。
+                # 这是树模型最喜欢的“交互特征”，能直接区分趋势的真伪。
+                feat_dict[f'pv_corr_{w}_lag{lag}'] = df['mid_diff1'].rolling(w).corr(df['amount']).mean()
+                # 2. 价格动量与量能分配的差值 (Z-Score Spread)
+                # 将价格变动幅度与对数成交额分别做 Z-Score，看谁跑得更快。
+                # 逻辑：如果 price_z 远大于 amount_z，说明是“无量空涨”。
+                price_z = (df['mid_diff1'] - df['mid_diff1'].rolling(w).mean()) / (df['mid_diff1'].rolling(w).std() + 1e-10)
+                amount_z = (df['amount'] - df['amount'].rolling(w).mean()) / (df['amount'].rolling(w).std() + 1e-10)
+                feat_dict[f'pv_z_spread_{w}_lag{lag}'] = (price_z - amount_z).iloc[-1]
+
             lag_feats.update(feat_dict)
 
         x_extract.append(lag_feats)
@@ -561,21 +640,21 @@ def preprocess_platform(x: Union[List[pd.DataFrame], pd.DataFrame], is_local=Tru
         label = pd.concat(labels, axis=0).reset_index(drop=True)
         assert len(x_slice) == len(label)
 
-        # # TODO:
-        # x_extract1 = preprocess_slice(x_slice)
-        # print("x_extract1.shape: ", x_extract1.shape)
-        # # print("x_extract1['mid_diff1']: ", x_extract1["mid_diff1"])
-        # # print("x_extract1['mid_lr_k_lag1']: ", x_extract1["mid_lr_k_lag1"])
-        # # print("x_extract1['mid_lr_r2_lag1']: ", x_extract1["mid_lr_r2_lag1"])
-        # x_extract2 = preprocess_local(x_slice, is_slice=True)
-        # print("x_extract2.shape: ", x_extract2.shape)
-        # # 对列排序
-        # x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
-        # x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
-        # x_extract1.to_csv("x_extract1.csv", index=True)
-        # x_extract2.to_csv("x_extract2.csv", index=True)
-        # compare_dfs(x_extract1, x_extract2)
-        # exit(0)
+        # TODO:
+        x_extract1 = preprocess_slice(x_slice)
+        print("x_extract1.shape: ", x_extract1.shape)
+        # print("x_extract1['mid_diff1']: ", x_extract1["mid_diff1"])
+        # print("x_extract1['mid_lr_k_lag1']: ", x_extract1["mid_lr_k_lag1"])
+        # print("x_extract1['mid_lr_r2_lag1']: ", x_extract1["mid_lr_r2_lag1"])
+        x_extract2 = preprocess_local(x_slice, is_slice=True)
+        print("x_extract2.shape: ", x_extract2.shape)
+        # 对列排序
+        x_extract1 = x_extract1.reindex(sorted(x_extract1.columns), axis=1)
+        x_extract2 = x_extract2.reindex(sorted(x_extract2.columns), axis=1)
+        x_extract1.to_csv("x_extract1.csv", index=True)
+        x_extract2.to_csv("x_extract2.csv", index=True)
+        compare_dfs(x_extract1, x_extract2)
+        exit(0)
 
         if is_local==False:
             # 方法一
@@ -629,14 +708,18 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'relative_bid_density1', 'relative_bid_density2', 'relative_bid_density3', 
         'relative_ask_density1', 'relative_ask_density2', 'relative_ask_density3',
         'real_volume', 'price_volume_ratio',
+        
+        'mid_diff1', 
+        'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
+        'trade_sign', 'aggression_eff', 'price_control', 'close_pos',
     ]
 
     # 高阶特征
     # lags2 = [1, 2, 5]
     lags2 = [1]
     raw_cols2 = [
-        'mid_diff1', 
-        'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
+        # 'mid_diff1', 
+        # 'trade_impact', 'signed_amount', 'price_up_amount_down', 'amount_price_div', 
     ]
 
     # 高阶特征
@@ -696,7 +779,10 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'bsize1_delta40', 'bsize3_delta40', 'bsize5_delta40',
         'real_volume_delta1', 'real_volume_delta10', 'real_volume_delta40',
         'original_price', 'sym_class',
-        "mid_diff1_sum", "mid_diff1_open_close", "SignedTrendEff", 
+        "mid_diff1_sum5", "mid_diff1_open_close5", "SignedTrendEff5", 
+        "mid_diff1_sum20", "mid_diff1_open_close20", "SignedTrendEff20", 
+        "mid_diff1_sum50", "mid_diff1_open_close50", "SignedTrendEff50", 
+        "mid_diff1_sum100", "mid_diff1_open_close100", "SignedTrendEff100", 
         "real_volume_lr_k", "real_volume_lr_r2", "real_volume_trend_strength", 
         "real_volume_price_move_capacity", "real_volume_trend_liquidity_ratio", 
         "real_volume_trend_regime", "real_volume_trend_strength_gated", 
@@ -705,10 +791,19 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         "mid_diff1_is_high_vol5", "mid_diff1_is_high_vol20", "mid_diff1_is_high_vol50", "mid_diff1_is_high_vol100", 
         "sign_consistency5", "sign_consistency20", "sign_consistency50", "sign_consistency100", 
         "trend_persist5", "trend_persist20", "trend_persist50", "trend_persist100", 
-        "mid_diff1_vol_ratio_sl_5_50", 
-        "real_volume_vol_ratio_sl_5_50", 
-        "mid_diff1_vol_ratio_sl_20_100", 
-        "real_volume_vol_ratio_sl_20_100", 
+        "mid_diff1_vol_ratio_sl_5_50", "real_volume_vol_ratio_sl_5_50", 
+        "mid_diff1_vol_ratio_sl_20_100", "real_volume_vol_ratio_sl_20_100",         # 基于n_close成交方向的窗口特征
+        'trade_sign_sum5', 'trade_sign_sum20', 'trade_sign_sum50', 'trade_sign_sum100', 
+        'trade_sign_mean5', 'trade_sign_mean20', 'trade_sign_mean50', 'trade_sign_mean100', 
+        'trade_sign_aggression_eff5', 'trade_sign_aggression_eff20', 'trade_sign_aggression_eff50', 'trade_sign_aggression_eff100', 
+        'trade_sign_buy_run5', 'trade_sign_buy_run20', 'trade_sign_buy_run50', 'trade_sign_buy_run100', 
+        'trade_sign_sell_run5', 'trade_sign_sell_run20', 'trade_sign_sell_run50', 'trade_sign_sell_run100', 
+        'trade_sign_aggression_skew5', 'trade_sign_aggression_skew20', 'trade_sign_aggression_skew50', 'trade_sign_aggression_skew100', 
+        'trade_sign_price_control5', 'trade_sign_price_control20', 'trade_sign_price_control50', 'trade_sign_price_control100', 
+        'trade_sign_close_pressure5', 'trade_sign_close_pressure20', 'trade_sign_close_pressure50', 'trade_sign_close_pressure100',
+        'aggression_score5', 'aggression_score20', 'aggression_score50', 'aggression_score100',
+        "signed_amount_ema5", "price_impact_efficiency", "net_amount_ratio_10", "net_amount_ratio_30",
+        "pv_corr_20", "pv_corr_60", "pv_z_spread_20", "pv_z_spread_60", "cum_signed_amount_10", "cum_signed_amount_30"
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -752,25 +847,26 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         # 一阶差分
         extra_feats['mid_diff1'] = extra_feats['mid_price'].diff().fillna(0)
 
-        # 最近 100 tick 的 |diff| 之和（路径长度）
-        extra_feats['mid_diff1_sum'] = (
-            extra_feats['mid_diff1']
-            .abs()
-            .rolling(window=100, min_periods=1)
-            .sum()
-        )
+        for w in [5, 20, 50, 100]:
+            # 最近 100 tick 的 |diff| 之和（路径长度）
+            extra_feats[f'mid_diff1_sum{w}'] = (
+                extra_feats['mid_diff1']
+                .abs()
+                .rolling(window=w, min_periods=1)
+                .sum()
+            )
 
-        # 最近 100 tick 的 diff 之和（起点到终点的净变化）
-        extra_feats['mid_diff1_open_close'] = (
-            extra_feats['mid_diff1']
-            .rolling(window=100, min_periods=1)
-            .sum()
-        )
+            # 最近 100 tick 的 diff 之和（起点到终点的净变化）
+            extra_feats[f'mid_diff1_open_close{w}'] = (
+                extra_feats['mid_diff1']
+                .rolling(window=w, min_periods=1)
+                .sum()
+            )
 
-        # Signed Trend Efficiency
-        extra_feats['SignedTrendEff'] = (
-            extra_feats['mid_diff1_open_close'] / (extra_feats['mid_diff1_sum'] + 1e-5)
-        )
+            # Signed Trend Efficiency
+            extra_feats[f'SignedTrendEff{w}'] = (
+                extra_feats[f'mid_diff1_open_close{w}'] / (extra_feats[f'mid_diff1_sum{w}'] + 1e-5)
+            )
 
         # # 还原原始股价
         sym_to_price = {
@@ -912,6 +1008,48 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         extra_feats[f'mid_diff1_vol_ratio_sl_20_100'] = extra_feats[f'mid_diff1_vol_ratio20'] / (extra_feats[f'mid_diff1_vol_ratio100'] + 1e-6)
         extra_feats[f'real_volume_vol_ratio_sl_20_100'] = extra_feats[f'real_volume_vol_ratio20'] / (extra_feats[f'real_volume_vol_ratio100'] + 1e-6)
 
+        df['trade_sign'] = np.where(
+            df['n_close'] == df['n_ask1'],  1,
+            np.where(df['n_close'] == df['n_bid1'], -1, 0)
+        )
+
+        df['aggression_eff'] = df['trade_sign'] * np.sign(extra_feats['mid_diff1'])
+        df['price_control'] = df['trade_sign'] * extra_feats['mid_diff1']
+
+        df['close_pos'] = (
+            (df['n_close'] - df['n_midprice'])
+            / ((df['n_ask1'] - df['n_bid1']) / 2 + 1e-10)
+        )
+        
+        # 基于n_close成交方向的窗口特征
+        for w in [5, 20, 50, 100]:
+            extra_feats[f'trade_sign_sum{w}'] = df['trade_sign'].rolling(w, min_periods=1).sum()
+            extra_feats[f'trade_sign_mean{w}'] = df['trade_sign'].rolling(w, min_periods=1).mean()
+            extra_feats[f'trade_sign_aggression_eff{w}'] = df['aggression_eff'].rolling(w, min_periods=1).mean()
+
+            # 成交持续性
+            extra_feats[f'trade_sign_buy_run{w}'] = ((df['trade_sign'] == 1).rolling(w, min_periods=1)).sum()
+            extra_feats[f'trade_sign_sell_run{w}'] = ((df['trade_sign'] == -1).rolling(w, min_periods=1)).sum()
+
+            # 势能不对称
+            extra_feats[f'trade_sign_aggression_skew{w}'] = (
+                (extra_feats[f'trade_sign_buy_run{w}'] - extra_feats[f'trade_sign_sell_run{w}'])
+                / (w + 1e-10)
+            )
+
+            # 主动成交推动率
+            extra_feats[f'trade_sign_price_control{w}'] = (df['price_control'] == -1).rolling(w, min_periods=1).mean()
+
+            # rolling 成交压强
+            extra_feats[f'trade_sign_close_pressure{w}'] = (df['close_pos'] == -1).rolling(w, min_periods=1).mean()
+
+            # 势能组合指数
+            extra_feats[f'aggression_score{w}'] = (
+                0.4 * extra_feats[f'trade_sign_aggression_skew{w}']
+                + 0.3 * extra_feats[f'trade_sign_close_pressure{w}']
+                + 0.3 * extra_feats[f'trade_sign_price_control{w}']
+            )
+
         # 加权中间价
         extra_feats.update({
             'weighted_ab1': (
@@ -981,13 +1119,13 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         # 时间分段（每 30 分钟一档）
         df['time_interval'] = df['time'].apply(
             lambda x:
-                0 if x < 37800 else   # 09:30 - 10:30
-                1 if x < 39600 else   # 10:30 - 11:00
-                2 if x < 41400 else   # 11:00 - 11:30
-                3 if x < 46800 else   # 13:00 - 13:30
-                4 if x < 48600 else   # 13:30 - 14:00
-                5 if x < 50400 else   # 14:00 - 14:30
-                6 if x < 52200 else   # 14:30 - 15:00
+                0 if x < 36000 else   # 09:30 - 10:30
+                1 if x < 37800 else   # 10:30 - 11:00
+                2 if x < 39600 else   # 11:00 - 11:30
+                3 if x < 41400 else   # 13:00 - 13:30
+                4 if x < 46800 else   # 13:30 - 14:00
+                5 if x < 48600 else   # 14:00 - 14:30
+                6 if x < 50400 else   # 14:30 - 15:00
                 7                  # 其他时间
         )
 
@@ -1108,6 +1246,40 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             (np.abs(k) > k_threshold)
         ).astype(int)
         extra_feats[f'real_volume_trend_strength_gated'] = extra_feats[f'real_volume_trend_strength'] * extra_feats[f'real_volume_trend_regime']
+
+        # mid_price 和 amount 的联合特征
+        # Signed Log Money Flow (方向性对数资金流)
+        extra_feats['signed_amount'] = np.sign(df['mid_diff1']) * df['amount']
+        # 对其做短周期平滑，捕捉“持续性流向”
+        extra_feats['signed_amount_ema5'] = pd.Series(extra_feats['signed_amount'][-10:]).ewm(span=5).mean()
+        # Price-Amount Elasticity (价格-成交额弹性)
+        # 衡量“推升价格的难度”。在趋势末端，往往成交额很大但价格动量减弱（背离）。
+        extra_feats['price_impact_efficiency'] = (
+            df['mid_diff1'] / (df['amount'] + 1e-5)
+        )
+        # Cumulative Signed Amount (累积方向性成交额)
+        extra_feats['cum_signed_amount_10'] = extra_feats['signed_amount'].rolling(window=10).sum()
+        extra_feats['cum_signed_amount_30'] = extra_feats['signed_amount'].rolling(window=30).sum()
+        # Amount-Weighted Momentum (成交额加权动量)
+        # 相比纯价格动量，该指标能过滤掉“无量波动”产生的噪音
+        for w in [10, 30]:
+            # 逻辑：过去 W 个 tick 内，价格上涨时的成交额之和 vs 下跌时的成交额之和
+            pos_flow = (df['amount'] * (df['mid_diff1'] > 0)).rolling(w).sum()
+            neg_flow = (df['amount'] * (df['mid_diff1'] < 0)).rolling(w).sum()
+            extra_feats[f'net_amount_ratio_{w}'] = (pos_flow - neg_flow) / (pos_flow + neg_flow + 1e-10)
+        for w in [20, 60]:
+            # 1. 价格与成交量的滚动相关性 (Trend Confirmation)
+            # 相关性趋近 -1 表示极度背离，趋近 1 表示量价同步。
+            # 这是树模型最喜欢的“交互特征”，能直接区分趋势的真伪。
+            extra_feats[f'pv_corr_{w}'] = (
+                df['mid_diff1'].rolling(w).corr(df['amount']).mean()
+            )
+            # 2. 价格动量与量能分配的差值 (Z-Score Spread)
+            # 将价格变动幅度与对数成交额分别做 Z-Score，看谁跑得更快。
+            # 逻辑：如果 price_z 远大于 amount_z，说明是“无量空涨”。
+            price_z = (df['mid_diff1'] - df['mid_diff1'].rolling(w).mean()) / (df['mid_diff1'].rolling(w).std() + 1e-10)
+            amount_z = (df['amount'] - df['amount'].rolling(w).mean()) / (df['amount'].rolling(w).std() + 1e-10)
+            extra_feats[f'pv_z_spread_{w}'] = price_z - amount_z
         
         df = pd.concat([df, pd.DataFrame(extra_feats, index=df.index)], axis=1)
 

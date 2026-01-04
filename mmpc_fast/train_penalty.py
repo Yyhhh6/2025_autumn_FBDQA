@@ -1,5 +1,5 @@
 from .model_penalty import XGBModel
-from .Predictor_penalty import preprocess_local, preprocess_platform
+from .Predictor_57 import preprocess_local, preprocess_platform
 from .data_process import *
 import os
 import numpy as np

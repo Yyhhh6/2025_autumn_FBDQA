@@ -1,1 +1,1 @@
-scp -i C:\Users\kami\.ssh\Cybertron\id-rsa root@10.156.13.220:/user/qinyihua/codebase/2025_autumn_FBDQA/qyh_fast_QYH_1_3_22_17.zip E:\大四上\无敌量化挑战赛\
+scp -i C:\Users\kami\.ssh\Cybertron\id-rsa root@10.156.13.220:/user/qinyihua/codebase/2025_autumn_FBDQA/qyh_fast_QYH_1_4.zip E:\大四上\无敌量化挑战赛\

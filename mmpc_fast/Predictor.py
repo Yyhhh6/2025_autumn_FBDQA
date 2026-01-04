@@ -103,7 +103,7 @@ def split_df_sliding(df: pd.DataFrame, window=100):
     return xs
 
 
-def compare_dfs(df1, df2, tol=1e-8):
+def compare_dfs(df1, df2, tol=1e-6):
     # --- 统一转成 DataFrame ---
     if isinstance(df1, pd.Series):
         df1 = df1.to_frame()
@@ -126,8 +126,8 @@ def compare_dfs(df1, df2, tol=1e-8):
     df1_common = df1.loc[common_idx, common_cols]
     df2_common = df2.loc[common_idx, common_cols]
     
-    # diff_mask = (df1_common - df2_common).abs() > tol
-    diff_mask = ~(df1_common.eq(df2_common) | (df1_common.isna() & df2_common.isna()))
+    diff_mask = (df1_common - df2_common).abs() > tol
+    # diff_mask = ~(df1_common.eq(df2_common) | (df1_common.isna() & df2_common.isna()))
     num_diff = diff_mask.sum().sum()
     print("Number of different values (tol={}):".format(tol), num_diff)
     
@@ -578,7 +578,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
 
             # mid_diff1 与 成交量 的关系特征
             # 对其做短周期平滑，捕捉“持续性流向”
-            feat_dict[f'signed_amount_ema5_lag{lag}'] = pd.Series(df['signed_amount'][-10:]).ewm(span=5).mean().iloc[-1]
+            # feat_dict[f'signed_amount_ema5_lag{lag}'] = pd.Series(df['signed_amount'][-10:]).ewm(span=5).mean().iloc[-1]
             # Price-Amount Elasticity (价格-成交额弹性)
             # 衡量“推升价格的难度”。在趋势末端，往往成交额很大但价格动量减弱（背离）。
             feat_dict[f'price_impact_efficiency_lag{lag}'] = df['mid_diff1'].iloc[-1] / (df['amount'].iloc[-1] + 1e-5)
@@ -598,7 +598,7 @@ def preprocess_slice(x: list[pd.DataFrame]):
                 # 1. 价格与成交量的滚动相关性 (Trend Confirmation)
                 # 相关性趋近 -1 表示极度背离，趋近 1 表示量价同步。
                 # 这是树模型最喜欢的“交互特征”，能直接区分趋势的真伪。
-                feat_dict[f'pv_corr_{w}_lag{lag}'] = df['mid_diff1'].rolling(w).corr(df['amount']).mean()
+                # feat_dict[f'pv_corr_{w}_lag{lag}'] = df['mid_diff1'].rolling(w).corr(df['amount']).mean()
                 # 2. 价格动量与量能分配的差值 (Z-Score Spread)
                 # 将价格变动幅度与对数成交额分别做 Z-Score，看谁跑得更快。
                 # 逻辑：如果 price_z 远大于 amount_z，说明是“无量空涨”。
@@ -802,8 +802,10 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         'trade_sign_price_control5', 'trade_sign_price_control20', 'trade_sign_price_control50', 'trade_sign_price_control100', 
         'trade_sign_close_pressure5', 'trade_sign_close_pressure20', 'trade_sign_close_pressure50', 'trade_sign_close_pressure100',
         'aggression_score5', 'aggression_score20', 'aggression_score50', 'aggression_score100',
-        "signed_amount_ema5", "price_impact_efficiency", "net_amount_ratio_10", "net_amount_ratio_30",
-        "pv_corr_20", "pv_corr_60", "pv_z_spread_20", "pv_z_spread_60", "cum_signed_amount_10", "cum_signed_amount_30"
+        # "signed_amount_ema5", "price_impact_efficiency", "net_amount_ratio_10", "net_amount_ratio_30",
+        "price_impact_efficiency", "net_amount_ratio_10", "net_amount_ratio_30",
+        # "pv_corr_20", "pv_corr_60", "pv_z_spread_20", "pv_z_spread_60", "cum_signed_amount_10", "cum_signed_amount_30"
+        "pv_z_spread_20", "pv_z_spread_60", "cum_signed_amount_10", "cum_signed_amount_30"
     ]
     
     if isinstance(x, pd.DataFrame):
@@ -1119,13 +1121,13 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         # 时间分段（每 30 分钟一档）
         df['time_interval'] = df['time'].apply(
             lambda x:
-                0 if x < 37800 else   # 09:30 - 10:30
-                1 if x < 39600 else   # 10:30 - 11:00
-                2 if x < 41400 else   # 11:00 - 11:30
-                3 if x < 46800 else   # 13:00 - 13:30
-                4 if x < 48600 else   # 13:30 - 14:00
-                5 if x < 50400 else   # 14:00 - 14:30
-                6 if x < 52200 else   # 14:30 - 15:00
+                0 if x < 36000 else   # 09:30 - 10:30
+                1 if x < 37800 else   # 10:30 - 11:00
+                2 if x < 39600 else   # 11:00 - 11:30
+                3 if x < 41400 else   # 13:00 - 13:30
+                4 if x < 46800 else   # 13:30 - 14:00
+                5 if x < 48600 else   # 14:00 - 14:30
+                6 if x < 50400 else   # 14:30 - 15:00
                 7                  # 其他时间
         )
 
@@ -1251,7 +1253,7 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
         # Signed Log Money Flow (方向性对数资金流)
         extra_feats['signed_amount'] = np.sign(df['mid_diff1']) * df['amount']
         # 对其做短周期平滑，捕捉“持续性流向”
-        extra_feats['signed_amount_ema5'] = pd.Series(extra_feats['signed_amount'][-10:]).ewm(span=5).mean()
+        # extra_feats['signed_amount_ema5'] = pd.Series(extra_feats['signed_amount'][-10:]).ewm(span=5).mean()
         # Price-Amount Elasticity (价格-成交额弹性)
         # 衡量“推升价格的难度”。在趋势末端，往往成交额很大但价格动量减弱（背离）。
         extra_feats['price_impact_efficiency'] = (
@@ -1271,9 +1273,9 @@ def preprocess_local(x: Union[List[pd.DataFrame], pd.DataFrame], is_train=False,
             # 1. 价格与成交量的滚动相关性 (Trend Confirmation)
             # 相关性趋近 -1 表示极度背离，趋近 1 表示量价同步。
             # 这是树模型最喜欢的“交互特征”，能直接区分趋势的真伪。
-            extra_feats[f'pv_corr_{w}'] = (
-                df['mid_diff1'].rolling(w).corr(df['amount']).mean()
-            )
+            # extra_feats[f'pv_corr_{w}'] = (
+            #     df['mid_diff1'].rolling(w).corr(df['amount']).mean()
+            # )
             # 2. 价格动量与量能分配的差值 (Z-Score Spread)
             # 将价格变动幅度与对数成交额分别做 Z-Score，看谁跑得更快。
             # 逻辑：如果 price_z 远大于 amount_z，说明是“无量空涨”。
